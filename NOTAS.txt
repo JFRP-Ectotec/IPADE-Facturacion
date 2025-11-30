@@ -1,0 +1,5 @@
+DOCUMENTO: General -> Documentación -> Facturación -> Api_Facturacion_Corregido.pdf
+
+Generación de CFDI.
+
+Para el campo de todo en pipes, es "Layout Anexo 20_ComplementoPagos_2.0.xlsx"
