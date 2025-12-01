@@ -197,7 +197,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
 
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
-        SELF.fecha := SYSDATE - 1;   -- TEMPORAL: Dejar solo como SYSDATE
+        -- SELF.fecha := SYSDATE - 1;   -- TEMPORAL: Tomar TBRACCD_EFFECTIVE_DATE de la transacción.
         SELF.moneda := 'MXN';      -- Consultar catalogo c_Moneda
         SELF.metodoPago := metodoPago;  -- Consultar catalogo c_MetodoPago
         SELF.exportacion := '01';  -- Consultar catalogo c_Exportacion
@@ -218,13 +218,14 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
         END LOOP;
 
         FOR i IN (
-            SELECT t.tbraccd_amount
+            SELECT t.tbraccd_amount, t.tbraccd_effective_date
             FROM tbraccd t
             WHERE t.tbraccd_pidm = pidm
                 AND t.tbraccd_tran_number = tranNumber
         ) LOOP
             SELF.totalNum := i.tbraccd_amount;
             SELF.totalLetra := GZKNUMB.monto_escrito(SELF.totalNum);
+            SELF.fecha := i.tbraccd_effective_date;
         END LOOP;
 
         FOR j IN (
