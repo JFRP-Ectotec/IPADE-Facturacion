@@ -186,8 +186,8 @@ FROM dual;
 
 SELECT tvrpays_pidm, tvrpays_return_code, tvrpays_return_code_desc
 FROM tvrpays
-WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084606')
-	AND tvrpays_return_code = 108
+WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084858')
+	-- AND tvrpays_return_code = 108
 ORDER BY tvrpays_activity_date DESC
 ;
 
@@ -223,9 +223,19 @@ WHERE s.spriden_id = 'A00084666'
 	AND s.spriden_change_ind IS NULL
 ;
 
+SELECT *
+FROM gtvsdax
+WHERE GTVSDAX_COMMENTS LIKE '%wallets%'
+;
+
+SELECT *
+FROM GTVSDAX
+      WHERE gtvsdax_external_code = 'MICROSERV'
+;
+
 SELECT t.*
 FROM tzrpofi t JOIN spriden s ON (t.tzrpofi_pidm = s.spriden_pidm)
-WHERE s.spriden_id = 'A00084607'
+WHERE s.spriden_id = 'A00084858'
 	AND s.spriden_change_ind IS NULL
 ORDER BY t.tzrpofi_doc_number DESC
 ;

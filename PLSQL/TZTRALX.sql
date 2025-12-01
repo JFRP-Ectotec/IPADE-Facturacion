@@ -72,11 +72,21 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         RETURN VARCHAR2 IS
         vlc_idEmpresa VARCHAR2(50 CHAR);
     BEGIN
-        IF numEntidad = '1' THEN
-            vlc_idEmpresa := '6dfcc2bf-734f-4b36-961c-a23f62569870';
-        ELSIF numEntidad = '2' THEN
-            vlc_idEmpresa := '472529fa-1b6a-42b5-bb99-15f19feff522';
-        END IF;
+        -- IF numEntidad = '1' THEN
+        --     vlc_idEmpresa := '6dfcc2bf-734f-4b36-961c-a23f62569870';
+        -- ELSIF numEntidad = '2' THEN
+        --     vlc_idEmpresa := '472529fa-1b6a-42b5-bb99-15f19feff522';
+        -- END IF;
+
+        FOR i IN (
+            SELECT gtvsdax_comments
+            FROM gtvsdax
+            WHERE gtvsdax_external_code = 'TRALIX_FACT'
+                AND gtvsdax_internal_code = 'TRALIX_EMP'
+                AND GTVSDAX_INTERNAL_CODE_GROUP = 'IPADE' || numEntidad
+        ) LOOP
+            vlc_idEmpresa := i.gtvsdax_comments;
+        END LOOP;
 
         RETURN vlc_idEmpresa;
     END fn_obtener_idEmpresa;
@@ -85,11 +95,21 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         RETURN VARCHAR2 IS
         vlc_idTipoCfd VARCHAR2(50 CHAR);
     BEGIN
-        IF numEntidad = '1' THEN
-            vlc_idTipoCfd := 'd67da01f379a3f1497e9a58f035d9697';
-        ELSIF numEntidad = '2' THEN
-            vlc_idTipoCfd := '585087f1c503fff95e94fdebe7ace250';
-        END IF;
+        -- IF numEntidad = '1' THEN
+        --     vlc_idTipoCfd := 'd67da01f379a3f1497e9a58f035d9697';
+        -- ELSIF numEntidad = '2' THEN
+        --     vlc_idTipoCfd := '585087f1c503fff95e94fdebe7ace250';
+        -- END IF;
+
+        FOR i IN (
+            SELECT gtvsdax_comments
+            FROM gtvsdax
+            WHERE gtvsdax_external_code = 'TRALIX_FACT'
+                AND gtvsdax_internal_code = 'TRALIX_CFD'
+                AND GTVSDAX_INTERNAL_CODE_GROUP = 'IPADE' || numEntidad
+        ) LOOP
+            vlc_idTipoCfd := i.gtvsdax_comments;
+        END LOOP;
 
         RETURN vlc_idTipoCfd;
     END fn_obtener_idTipoCfd;
@@ -176,8 +196,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         l_response      CLOB;
         detException    BOOLEAN := false;
 
-        l_wallet_path VARCHAR2(200) := '/opt/oracle/dcs/commonstore/wallets/DBTEST_vtq_qro/cert';
-        l_wallet_password VARCHAR2(200) := 'Ipade2025#$';
+        l_wallet_path VARCHAR2(200); -- := '/opt/oracle/dcs/commonstore/wallets/DBTEST_vtq_qro/cert';
+        l_wallet_password VARCHAR2(200); -- := 'Ipade2025#$';
 
         l_indice NUMBER;
         l_ind_fin NUMBER;
@@ -191,6 +211,27 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         l_payload_temp VARCHAR2(32767);
     BEGIN
         estatus := TRUE;
+
+        -- Obtener valores para llamar a webservices
+        FOR h IN (
+            SELECT TO_CHAR(GTVSDAX_COMMENTS) as valor
+            FROM general.gtvsdax
+            WHERE gtvsdax_external_code = 'MICROSERV'
+                AND gtvsdax_internal_code = 'INTG_IPADE'
+                AND gtvsdax_internal_code_group = 'WALLET_L'
+        ) LOOP
+            l_wallet_path := h.valor;
+        END LOOP;
+
+        FOR j IN (
+            SELECT TO_CHAR(GTVSDAX_COMMENTS) as valor
+            FROM general.gtvsdax
+            WHERE gtvsdax_external_code = 'MICROSERV'
+                AND gtvsdax_internal_code = 'INTG_IPADE'
+                AND gtvsdax_internal_code_group = 'WALLET_P'
+        ) LOOP
+            l_wallet_password := j.valor;
+        END LOOP;
 
         FOR i IN (
             SELECT TO_CHAR(GTVSDAX_COMMENTS) as valor
