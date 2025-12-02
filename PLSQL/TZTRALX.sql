@@ -813,11 +813,12 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         l_response      CLOB;
 
     BEGIN
+        dbms_output.put_line('Payload:'||l_payload);
         l_response := envio_tralix('/facturatralix/cancelaCFDI', l_payload, estatus);
         
         -- TEMPORAL forzar para demo INICIO
-        l_response := '{"statusCode":200,"headers":{"Content-Type":"application/json"},"body":"Error en el servicio de cancelaci\u00F3n"}';
-        estatus := TRUE;
+        -- l_response := '{"statusCode":200,"headers":{"Content-Type":"application/json"},"body":"Error en el servicio de cancelaci\u00F3n"}';
+        -- estatus := TRUE;
         -- TEMPORAL forzar para demo FIN
 
         RETURN l_response;
@@ -960,6 +961,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlc_llamada VARCHAR2(4000 CHAR);
 
         vlc_numFactura VARCHAR2(100 CHAR);
+        vlc_empresa VARCHAR2(100 CHAR);
     BEGIN
         vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula_nuevo, tran_number_nuevo);
 
@@ -1007,13 +1009,14 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         END IF;
 
         FOR j IN (
-            SELECT TZRPOFI_IAC_CDE, TZRPOFI_DOC_NUMBER
+            SELECT TZRPOFI_IAC_CDE, TZRPOFI_DOC_NUMBER, TZRPOFI_EXP_PDF_LBL_1
             FROM tzrpofi
             WHERE tzrpofi_pidm = vln_pidm_nuevo
                 AND TZRPOFI_DOCNUM_POS = tran_number_nuevo
         ) LOOP
             vlc_guid_sustituir := j.TZRPOFI_IAC_CDE;
             vlc_numFactura := j.TZRPOFI_DOC_NUMBER;
+            vlc_empresa := j.TZRPOFI_EXP_PDF_LBL_1; 
         END LOOP;
 
         dbms_output.put_line('UUID 2:'||vlc_guid_sustituir);
@@ -1041,7 +1044,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             vlc_num_entidad := n.empresa;
         END LOOP;
 
-        vlc_objeto_principal := crea_objeto_sust_tralix(vlc_guid_cancelar, vlc_guid_sustituir, motivo_canc, vlc_num_entidad);
+        vlc_objeto_principal := crea_objeto_sust_tralix(vlc_guid_cancelar, vlc_guid_sustituir, motivo_canc, vlc_empresa);
         vlt_respuesta.mainData := vlc_objeto_principal;
         vlc_envioTralix := envio_canc_tralix(vlc_objeto_principal, vlb_estatusEnvio);
         bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
@@ -1049,6 +1052,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         dbms_output.put_line('buffer:'||bufferMensaje);
 
         IF (vlb_estatusEnvio) THEN
+
+            dbms_output.put_line('TRUE');
+
             -- vlc_full_motivo_canc := motivo_canc;
             -- IF (motivo_canc = '02') THEN
             --     vlc_full_motivo_canc := vlc_full_motivo_canc || '- Comprobante emitido con errores sin relación.';
@@ -1069,6 +1075,11 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             END IF;
             COMMIT;
         ELSE
+            dbms_output.put_line('FALSE - ' || vlt_respuesta.errores.COUNT);
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.errores.EXTEND;
+            vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
+
             /* Guardar en TZRPAYS, con status = 'T' */
             BEGIN
                 pr_log_error(vln_pidm_orig, vlc_numFactura, bufferMensaje,
