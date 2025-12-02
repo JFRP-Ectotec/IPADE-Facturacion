@@ -807,7 +807,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
     END crea_objeto_sust_tralix;
 
     FUNCTION envio_canc_tralix(
-        l_payload CLOB,
+        l_payload IN CLOB,
+        l_operacion IN VARCHAR2,
         estatus OUT BOOLEAN)
         RETURN CLOB IS
         l_response      CLOB;
@@ -817,10 +818,13 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         l_response := envio_tralix('/facturatralix/cancelaCFDI', l_payload, estatus);
         
         -- TEMPORAL forzar para demo INICIO
-        -- l_response := '{"statusCode":200,"headers":{"Content-Type":"application/json"},"body":"Error en el servicio de cancelaci\u00F3n"}';
-        -- estatus := TRUE;
+        IF (l_operacion = 'CANC') THEN
+            
+            l_response := '{"statusCode":200,"headers":{"Content-Type":"application/json"},"body":"Error en el servicio de cancelaci\u00F3n"}';
+            estatus := TRUE;
+        END IF;
         -- TEMPORAL forzar para demo FIN
-
+        
         RETURN l_response;
     END envio_canc_tralix;
 
@@ -896,7 +900,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         vlc_objeto_principal := crea_objeto_sust_tralix(vlc_guid_cancelar, '', motivo_canc, vlc_empresa);
         vlt_respuesta.mainData := vlc_objeto_principal;
-        vlc_envioTralix := envio_canc_tralix(vlc_objeto_principal, vlb_estatusEnvio);
+        vlc_envioTralix := envio_canc_tralix(vlc_objeto_principal, 'CANC', vlb_estatusEnvio);
         bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
 
         IF (vlb_estatusEnvio) THEN
@@ -1046,7 +1050,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         vlc_objeto_principal := crea_objeto_sust_tralix(vlc_guid_cancelar, vlc_guid_sustituir, motivo_canc, vlc_empresa);
         vlt_respuesta.mainData := vlc_objeto_principal;
-        vlc_envioTralix := envio_canc_tralix(vlc_objeto_principal, vlb_estatusEnvio);
+        vlc_envioTralix := envio_canc_tralix(vlc_objeto_principal, 'SUST', vlb_estatusEnvio);
         bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
 
         dbms_output.put_line('buffer:'||bufferMensaje);
