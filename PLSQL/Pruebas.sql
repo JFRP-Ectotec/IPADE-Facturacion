@@ -78,7 +78,7 @@ WHERE s.spriden_id = 'A00084596'
 SELECT t.*
 FROM TZRPOFI t JOIN spriden s
 	ON (t.tzrpofi_pidm = s.spriden_pidm)
-WHERE s.spriden_id = 'A00084635'
+WHERE s.spriden_id = 'A00010493'
 	AND s.spriden_change_ind IS NULL
 ORDER BY t.tzrpofi_doc_number
 ;
@@ -140,15 +140,19 @@ WHERE s.spriden_id = 'A00084607'
     AND t.tbrappl_pay_tran_number = 46
 ;
 
-SELECT *
-FROM tzrpofi
-WHERE tzrpofi_iac_cde LIKE '81D31E%'
+SELECT t.*
+FROM tzrpofi t JOIN tbraccd t2
+	ON (t.tzrpofi_pidm = t2.tbraccd_pidm
+		AND t.tzrpofi_docnum_pos = t2.tbraccd_tran_number)
+WHERE t.tzrpofi_iac_cde IS NOT NULL
+	AND t2.tbraccd_detail_code = 'FANT'
+	AND t.tzrpofi_pidm = gb_common.f_get_pidm('A00084824')
 ;
 
+A000
+
 SELECT *
-FROM tbbacct
-WHERE tbbacct_pidm = 104673
-	-- AND tbbacct_bill_code = 'NO'
+FROM tbraccd
 ;
 
 SELECT SUBSTR('PUBGRAL1', 8, 1)
@@ -162,8 +166,8 @@ WHERE object_name = 'TZKSFIP'
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084606';
-	tran_number NUMBER := 85;
+	matricula VARCHAR2(20 CHAR) := 'A00010493';
+	tran_number NUMBER := 15;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -446,3 +450,4 @@ WHERE object_name LIKE 'TY_TRALIX%'
 
 SELECT TRIM(TO_CHAR(13.79, '9999999990.00'))
 FROM dual;
+
