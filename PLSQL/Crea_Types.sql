@@ -1276,6 +1276,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
     MEMBER PROCEDURE ajustar_pubgral,
     MEMBER PROCEDURE validar,
     MEMBER PROCEDURE impuestos_default(pidm NUMBER, tranNumber NUMBER,
+        totalCargos OUT NUMBER, impTrasladados OUT NUMBER),
+    MEMBER PROCEDURE impuestos_anticipada(pidm NUMBER, tranNumber NUMBER,
         totalCargos OUT NUMBER, impTrasladados OUT NUMBER)
 ) NOT FINAL INSTANTIABLE
 ;
@@ -1337,7 +1339,12 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.impuestosRets := TY_TRALIX_ARR_07();
         SELF.errores := TY_TRALIX_ARR_ERROR();
 
-        impuestos_default(vln_pidm, tranNumber, totalCargos, impTrasladados);
+        dbms_output.put_line('procesoFactura: '||procesoFactura);
+        IF (procesoFactura = 'ANT') THEN
+            impuestos_anticipada(vln_pidm, tranNumber, totalCargos, impTrasladados);
+        ELSE
+            impuestos_default(vln_pidm, tranNumber, totalCargos, impTrasladados);
+        END IF;
         
         numLineas := numLineas + SELF.conceptos.COUNT
             + SELF.impuestosTras.COUNT + SELF.concImpTras.COUNT;
@@ -1469,6 +1476,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             IF (SELF.impuestosTras.COUNT > 0) THEN
                 FOR p IN SELF.impuestosTras.FIRST .. SELF.impuestosTras.LAST
                 LOOP
+                    dbms_output.put_line(SELF.impuestosTras(p).imprimir_linea);
                     SELF.impuestosTras(p).validar;
                     IF (SELF.impuestosTras(p).errores.COUNT > 0) THEN
                         FOR q IN SELF.impuestosTras(p).errores.FIRST .. SELF.impuestosTras(p).errores.LAST
@@ -1504,7 +1512,6 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         vlc_detalleImp TBRACCD.TBRACCD_DETAIL_CODE%TYPE;
         vlb_exento BOOLEAN;
         concepto TY_TRALIX_LINEA_05;
-        -- totalCargos NUMBER := 0;
         vln_subTotal TBRACCD.TBRACCD_AMOUNT%TYPE;
     BEGIN
         totalCargos := 0;
@@ -1561,6 +1568,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
                 totalCargos := totalCargos + vln_subTotal;
 
+                vlc_detalleImp := j.tbraccd_detail_code;
+
                 impuestoTras := TY_TRALIX_LINEA_06(
                     vlc_detalleImp, 
                     vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
@@ -1585,8 +1594,62 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             SELF.concImpTras.EXTEND;
             SELF.concImpTras(SELF.concImpTras.COUNT) := concImpTrasRow;
         END LOOP;
-
     END impuestos_default;
+
+    MEMBER PROCEDURE impuestos_anticipada(pidm NUMBER, tranNumber NUMBER,
+        totalCargos OUT NUMBER, impTrasladados OUT NUMBER) IS
+        impuestoTras TY_TRALIX_LINEA_06;
+        concImpTrasRow TY_TRALIX_LINEA_05C;
+        vln_sumaImpuestos NUMBER := 0;
+        vlc_detalleImp TBRACCD.TBRACCD_DETAIL_CODE%TYPE;
+        vlb_exento BOOLEAN;
+        concepto TY_TRALIX_LINEA_05;
+        vln_subTotal TBRACCD.TBRACCD_AMOUNT%TYPE;
+    BEGIN
+        totalCargos := 0;
+        impTrasladados := 0;
+        vlc_detalleImp := 'IVA';
+        FOR j IN (
+            SELECT tbraccd_amount, tbraccd_receipt_number,
+                tbraccd_detail_code
+            FROM tbraccd
+            WHERE tbraccd_pidm = pidm
+                AND tbraccd_tran_number = tranNumber
+        ) LOOP
+            vlb_exento := FALSE;
+            vln_subTotal := j.tbraccd_amount / 1.16;
+            vln_sumaImpuestos := j.tbraccd_amount - vln_subTotal;
+            concepto := TY_TRALIX_LINEA_05(pidm, tranNumber);
+            concepto.importe := vln_subTotal;
+            SELF.conceptos.EXTEND;
+            SELF.conceptos(SELF.conceptos.COUNT) := concepto;
+
+            totalCargos := totalCargos + vln_subTotal;
+
+            impuestoTras := TY_TRALIX_LINEA_06(
+                vlc_detalleImp, 
+                vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
+                vln_sumaImpuestos,
+                j.tbraccd_amount - vln_sumaImpuestos);
+
+            impTrasladados := impTrasladados + vln_sumaImpuestos;
+
+            concImpTrasRow := TY_TRALIX_LINEA_05C(
+                concepto.idConcepto,
+                j.tbraccd_amount - vln_sumaImpuestos,
+                vlc_detalleImp,
+                -- vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
+                impuestoTras.tasaCuota,
+                vln_sumaImpuestos,
+                'Tasa');
+
+            SELF.impuestosTras.EXTEND;
+            SELF.impuestosTras(SELF.impuestosTras.COUNT) := impuestoTras;    
+
+            SELF.concImpTras.EXTEND;
+            SELF.concImpTras(SELF.concImpTras.COUNT) := concImpTrasRow;
+        END LOOP;
+    END impuestos_anticipada;
 END;
 
 -------------

@@ -4,7 +4,7 @@
 
 DROP SEQUENCE IPADEDEV.TEST_TRALIX_IP2_SEQ;
 
-CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP2_SEQ START WITH 1150 INCREMENT BY 1 MINVALUE 0 NOCYCLE NOCACHE NOORDER; 
+CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP2_SEQ START WITH 1400 INCREMENT BY 1 MINVALUE 0 NOCYCLE NOCACHE NOORDER; 
 
 DROP SEQUENCE IPADEDEV.TEST_TRALIX_IP1_SEQ;
 
@@ -51,13 +51,13 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
     --     estatus OUT BOOLEAN)
     --     RETURN CLOB;
 
-    -- FUNCTION fn_factura_ant_tralix(
-    --     matricula IN VARCHAR2,
-    --     tran_number IN NUMBER,
-    --     tipo_pago_banner IN VARCHAR2 DEFAULT '99',
-    --     tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE',  /* Valores válidos 'PUE', 'PPD' */
-    --     etiqueta IN VARCHAR2 DEFAULT 'FAC')
-    --     RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
+    FUNCTION fn_factura_ant_tralix(
+        matricula IN VARCHAR2,
+        tran_number IN NUMBER,
+        tipo_pago_banner IN VARCHAR2 DEFAULT '99',
+        tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE',  /* Valores válidos 'PUE', 'PPD' */
+        etiqueta IN VARCHAR2 DEFAULT 'FAC')
+        RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
     separador constant varchar2(1) := '|';
 END TZTRALX;
@@ -449,7 +449,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE', 
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
-        proceso_factura IN VARCHAR2)   -- DEF = Default, ANT = Anticipada, CP = Complemento de Pago
+        proceso_factura IN VARCHAR2 DEFAULT 'DEF')   -- DEF = Default, ANT = Anticipada, CP = Complemento de Pago
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlc_respuesta CLOB;
         ipade_pidm NUMBER;
@@ -1107,6 +1107,18 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         RETURN vlt_respuesta;
     END fn_sustitucion_tralix;
+
+    FUNCTION fn_factura_ant_tralix(
+        matricula IN VARCHAR2,
+        tran_number IN NUMBER,
+        tipo_pago_banner IN VARCHAR2 DEFAULT '99',
+        tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE', 
+        etiqueta IN VARCHAR2 DEFAULT 'FAC')
+        RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
+    BEGIN
+        RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
+            tipo_pago_facturar, etiqueta, 'ANT');
+    END fn_factura_ant_tralix;
 END TZTRALX;
 /
 show errors;
