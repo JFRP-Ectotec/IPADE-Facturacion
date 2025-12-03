@@ -1339,7 +1339,6 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.impuestosRets := TY_TRALIX_ARR_07();
         SELF.errores := TY_TRALIX_ARR_ERROR();
 
-        dbms_output.put_line('procesoFactura: '||procesoFactura);
         IF (procesoFactura = 'ANT') THEN
             impuestos_anticipada(vln_pidm, tranNumber, totalCargos, impTrasladados);
         ELSE
@@ -1349,11 +1348,9 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         numLineas := numLineas + SELF.conceptos.COUNT
             + SELF.impuestosTras.COUNT + SELF.concImpTras.COUNT;
 
-        dbms_output.put_line('totalCargos: '||totalCargos||' - '||'impTrasladados:'||impTrasladados);
         SELF.info_gral_comprobante.set_cargos(totalCargos, impTrasladados);
         
         numLineas := numLineas + SELF.impuestosRets.COUNT;
-
         numLineas := numLineas + 1;
         SELF.finCfdi := ty_tralix_linea_99(numLineas);
 
@@ -1476,7 +1473,6 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             IF (SELF.impuestosTras.COUNT > 0) THEN
                 FOR p IN SELF.impuestosTras.FIRST .. SELF.impuestosTras.LAST
                 LOOP
-                    dbms_output.put_line(SELF.impuestosTras(p).imprimir_linea);
                     SELF.impuestosTras(p).validar;
                     IF (SELF.impuestosTras(p).errores.COUNT > 0) THEN
                         FOR q IN SELF.impuestosTras(p).errores.FIRST .. SELF.impuestosTras(p).errores.LAST

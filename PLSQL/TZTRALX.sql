@@ -317,7 +317,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         l_indice := l_indice + LENGTH(l_statusCodeTag);
 
         lr_status := SUBSTR(l_response, l_indice, l_ind_fin - l_indice);
-        dbms_output.put_line('Indice:'||l_indice||' - '||lr_status);
 
         -- Determinar body
         l_indice := INSTR(l_response, l_bodyTag);
@@ -532,8 +531,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             vlc_num_tipoDir := 1;
         END IF;
 
-        dbms_output.put_line('camp_code:'||vlc_camp_code);
-        dbms_output.put_line('num_tipoDir:'||vlc_num_tipoDir);
+        -- dbms_output.put_line('camp_code:'||vlc_camp_code);
+        -- dbms_output.put_line('num_tipoDir:'||vlc_num_tipoDir);
         dbms_output.put_line('num_entidad:'||vlc_num_entidad);
 
         vlc_tipo_pago_banner := tipo_pago_banner;
@@ -726,7 +725,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     datosFactura.receptor.usoCFDI,
                     tipo_pago_facturar);
 
-                dbms_output.put_line('Registrar en TSTA');
+                -- dbms_output.put_line('Registrar en TSTA');
 
                 vlc_llamada := tzkrsta.fn_registrar(vln_pidm, tran_number, registro_tsta);
 
@@ -821,7 +820,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         l_response      CLOB;
 
     BEGIN
-        dbms_output.put_line('Payload:'||l_payload);
+        -- dbms_output.put_line('Payload:'||l_payload);
         l_response := envio_tralix('/facturatralix/cancelaCFDI', l_payload, estatus);
         
         -- TEMPORAL forzar para demo INICIO
@@ -1010,7 +1009,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             vlc_guid_cancelar := i.TZRPOFI_IAC_CDE;
         END LOOP;
 
-        dbms_output.put_line('UUID 1:'||vlc_guid_cancelar);
+        -- dbms_output.put_line('UUID 1:'||vlc_guid_cancelar);
 
         IF (NVL(vlc_guid_cancelar, '|') = '|') THEN
             vlt_respuesta.estatus := 'ERROR';
@@ -1030,7 +1029,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             vlc_empresa := j.TZRPOFI_EXP_PDF_LBL_1; 
         END LOOP;
 
-        dbms_output.put_line('UUID 2:'||vlc_guid_sustituir);
+        -- dbms_output.put_line('UUID 2:'||vlc_guid_sustituir);
 
         IF (NVL(vlc_guid_sustituir, '|') = '|') THEN
             vlt_respuesta.estatus := 'ERROR';
@@ -1063,9 +1062,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         dbms_output.put_line('buffer:'||bufferMensaje);
 
         IF (vlb_estatusEnvio) THEN
-
-            dbms_output.put_line('TRUE');
-
             -- vlc_full_motivo_canc := motivo_canc;
             -- IF (motivo_canc = '02') THEN
             --     vlc_full_motivo_canc := vlc_full_motivo_canc || '- Comprobante emitido con errores sin relación.';
@@ -1086,7 +1082,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             END IF;
             COMMIT;
         ELSE
-            dbms_output.put_line('FALSE - ' || vlt_respuesta.errores.COUNT);
             vlt_respuesta.estatus := 'ERROR';
             vlt_respuesta.errores.EXTEND;
             vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
