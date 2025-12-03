@@ -327,6 +327,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_02 UNDER TY_TRALIX_LINEA
         idRelacionado VARCHAR2,
         tipoRelacion VARCHAR2
     ) RETURN SELF AS RESULT,
+    MEMBER FUNCTION tiene_valor RETURN BOOLEAN,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2
 );
 
@@ -347,6 +348,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02 AS
         SELF.tipoRelacion := tipoRelacion;  -- Consultar catalogo c_MetodoPago
         RETURN;
     END TY_TRALIX_LINEA_02;
+
+    MEMBER FUNCTION tiene_valor RETURN BOOLEAN IS
+    BEGIN
+        RETURN (NVL(SELF.idRelacionado, '|') != '|');
+    END tiene_valor;
 
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
@@ -369,6 +375,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_02A UNDER TY_TRALIX_LINEA
         idRelacionado VARCHAR2,
         uuid VARCHAR2
     ) RETURN SELF AS RESULT,
+    MEMBER FUNCTION tiene_valor RETURN BOOLEAN,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2
 );
 
@@ -389,6 +396,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
         SELF.uuid := uuid;  -- Consultar catalogo c_MetodoPago
         RETURN;
     END TY_TRALIX_LINEA_02A;
+
+    MEMBER FUNCTION tiene_valor RETURN BOOLEAN IS
+    BEGIN
+        RETURN (NVL(SELF.idRelacionado, '|') != '|');
+    END tiene_valor;
 
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
@@ -1253,6 +1265,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
 (
     inicio_archivo TY_TRALIX_LINEA_00,
     info_gral_comprobante TY_TRALIX_LINEA_01,
+    info_sustitucion TY_TRALIX_LINEA_02,
+    info_sust_detalle TY_TRALIX_LINEA_02A,
     receptor TY_TRALIX_LINEA_03,
     conceptos TY_TRALIX_ARR_05,
     concImpTras TY_TRALIX_ARR_05C,
@@ -1333,6 +1347,9 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
         numLineas := numLineas + 1;
 
+        SELF.info_sustitucion := TY_TRALIX_LINEA_02('', '');
+        SELF.info_sust_detalle := TY_TRALIX_LINEA_02A('', '');
+
         SELF.conceptos := TY_TRALIX_ARR_05();
         SELF.concImpTras := TY_TRALIX_ARR_05C();
         SELF.impuestosTras := TY_TRALIX_ARR_06();
@@ -1361,7 +1378,16 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         vlc_respuesta VARCHAR2(4000 CHAR);
     BEGIN
         vlc_respuesta := SELF.inicio_archivo.imprimir_linea || '|' ||
-            SELF.info_gral_comprobante.imprimir_linea || '|' ||
+            SELF.info_gral_comprobante.imprimir_linea;
+
+        IF (SELF.info_sustitucion.tiene_valor) THEN
+            vlc_respuesta := vlc_respuesta || '|' ||
+                SELF.info_sustitucion.imprimir_linea || '|' ||
+                SELF.info_sust_detalle.imprimir_linea
+            ;
+        END IF;
+            
+        vlc_respuesta := vlc_respuesta || '|' ||
             SELF.receptor.imprimir_linea
         ;
 
