@@ -37,3 +37,18 @@ BEGIN
 		END LOOP;
 	END IF;
 END;
+
+DECLARE
+	matricula VARCHAR2(20 CHAR) := 'A00019509';
+	tran_number NUMBER := 1;
+	vlt_compPago TY_TRALIX_COMPPAGO;
+BEGIN
+	dbms_output.put_line('*'||TO_CHAR(tran_number, '000000')||'*');
+	-- vlt_compPago := TY_TRALIX_COMPPAGO(matricula, tran_number, '1', '1', '28', 'PPD');
+	-- dbms_output.put_line(vlt_compPago.imprimir_linea);
+END;
+
+SELECT *
+FROM DBA_OBJECTS
+WHERE object_name LIKE 'TY_TRALIX%'
+;

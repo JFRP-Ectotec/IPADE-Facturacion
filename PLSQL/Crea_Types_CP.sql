@@ -47,7 +47,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
 
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
-        RETURN SELF.tipo_registro || SELF.sep ||
+        RETURN '\n' || SELF.tipo_registro || SELF.sep ||
             SELF.idPagos || SELF.sep ||
             SELF.versionLinea || SELF.sep ||
             SELF.format_fecha(SELF.FechaPago) || SELF.sep ||
@@ -120,7 +120,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
 
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
-        RETURN SELF.tipo_registro || SELF.sep ||
+        RETURN '\n' || SELF.tipo_registro || SELF.sep ||
             SELF.format_moneda(SELF.totRetencionesIVA) || SELF.sep ||
             SELF.format_moneda(SELF.totRetencionesISR) || SELF.sep ||
             SELF.format_moneda(SELF.totRetencionesIEPS) || SELF.sep ||
@@ -188,7 +188,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
 
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
-        RETURN SELF.tipo_registro || SELF.sep ||
+        RETURN '\n' || SELF.tipo_registro || SELF.sep ||
             SELF.idPagos || SELF.sep ||
             SELF.uuidPagoOriginal || SELF.sep ||
             SELF.serie || SELF.sep ||
@@ -253,7 +253,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
 
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
-        RETURN SELF.tipo_registro || SELF.sep ||
+        RETURN '\n' || SELF.tipo_registro || SELF.sep ||
             SELF.idPagos || SELF.sep ||
             SELF.format_moneda(SELF.baseDR) || SELF.sep ||
             SELF.impuestoDR || SELF.sep ||
@@ -261,6 +261,154 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
             TO_CHAR(SELF.tasaCuotaDR, '0.009999') || SELF.sep ||
             SELF.format_moneda(SELF.importeDR)
         ;
+    END imprimir_linea;
+
+    -- MEMBER PROCEDURE validar IS
+    -- BEGIN
+    --     SELF.INIT_ERRORES;
+    --     IF (NVL(SELF.id_archivo, '|') = '|') THEN
+    --         SELF.AGREGAR_ERROR('Se debe especificar un identificador de archivo');
+    --     END IF;
+    -- END validar;
+END;
+
+DROP TYPE TY_TRALIX_ARR_IMP_CP;
+
+CREATE OR REPLACE TYPE TY_TRALIX_ARR_IMP_CP AS TABLE OF TY_TRALIX_LINEA_IMP_CP;
+
+-------
+
+DROP TYPE TY_TRALIX_COMPPAGO;
+
+CREATE OR REPLACE TYPE TY_TRALIX_COMPPAGO AS OBJECT
+(
+    inicio_archivo TY_TRALIX_LINEA_00,
+    info_gral_comprobante TY_TRALIX_LINEA_01,
+    receptor TY_TRALIX_LINEA_03,
+    conceptos TY_TRALIX_ARR_05,
+    compPagos TY_TRALIX_LINEA_COMPPAGOS,
+    compTotales TY_TRALIX_LINEA_COMPTOT,
+    doctoRel TY_TRALIX_LINEA_COMPDOCTREL,
+    impuestos_DR TY_TRALIX_ARR_IMP_CP,
+    impuestos_P TY_TRALIX_ARR_IMP_CP,
+    envio_automatico TY_TRALIX_LINEA_09,
+    finCfdi TY_TRALIX_LINEA_99,
+    errores TY_TRALIX_ARR_ERROR,
+    CONSTRUCTOR FUNCTION TY_TRALIX_COMPPAGO(
+        matricula VARCHAR2,
+        tranNumber NUMBER,
+        numEntidad VARCHAR2,
+        difEmpresa VARCHAR2,
+        formaPago VARCHAR2,
+        metodoPago VARCHAR2
+    ) RETURN SELF AS RESULT,
+    MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
+    MEMBER PROCEDURE validar */
+);
+
+CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
+    CONSTRUCTOR FUNCTION TY_TRALIX_COMPPAGO(
+        matricula VARCHAR2,
+        tranNumber NUMBER,
+        numEntidad VARCHAR2,
+        difEmpresa VARCHAR2,
+        formaPago VARCHAR2,
+        metodoPago VARCHAR2
+    ) RETURN SELF AS RESULT IS
+        idPagos VARCHAR2(50 CHAR);
+        vln_pidm SPRIDEN.SPRIDEN_PIDM%TYPE;
+        numLineas NUMBER := 0;
+    BEGIN
+        idPagos := matricula || '_' || TRIM(TO_CHAR(tranNumber, '000000'));
+        vln_pidm := gb_common.f_get_pidm(matricula);
+        SELF.inicio_archivo := ty_tralix_linea_00(idPagos || '.txt');
+        numLineas := numLineas + 1;
+
+        SELF.envio_automatico := ty_tralix_linea_09(matricula);
+        -- numLineas := numLineas + 1;
+
+        SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, 
+            numEntidad, difEmpresa, metodoPago, formaPago);
+        SELF.info_gral_comprobante.metodoPago := '';
+        numLineas := numLineas + 1;
+        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
+
+        IF (SELF.receptor.esPubGral = 'TRUE') THEN
+            SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;
+        END IF;
+
+        SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
+        numLineas := numLineas + 1;
+
+        SELF.compPagos := TY_TRALIX_LINEA_COMPPAGOS(vln_pidm, tranNumber);
+        numLineas := numLineas + 1;
+
+        SELF.compTotales := TY_TRALIX_LINEA_COMPTOT(vln_pidm, tranNumber);
+        numLineas := numLineas + 1;
+
+        SELF.doctoRel := TY_TRALIX_LINEA_COMPDOCTREL(vln_pidm, tranNumber);
+        numLineas := numLineas + 1;
+
+        SELF.conceptos := TY_TRALIX_ARR_05();
+        SELF.impuestos_DR := TY_TRALIX_ARR_IMP_CP();
+        SELF.impuestos_P := TY_TRALIX_ARR_IMP_CP();
+        SELF.errores := TY_TRALIX_ARR_ERROR();
+
+        numLineas := numLineas + SELF.conceptos.COUNT
+            + SELF.impuestos_DR.COUNT + SELF.impuestos_P.COUNT;
+
+        numLineas := numLineas + 1;
+        SELF.finCfdi := ty_tralix_linea_99(numLineas);
+
+        RETURN;
+    END TY_TRALIX_COMPPAGO;
+
+    MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
+        vlc_respuesta VARCHAR2(4000 CHAR);
+    BEGIN
+        vlc_respuesta := SELF.inicio_archivo.imprimir_linea || '|' ||
+            SELF.info_gral_comprobante.imprimir_linea || '|' ||
+            SELF.receptor.imprimir_linea
+        ;
+
+        vlc_respuesta := vlc_respuesta || '|' ||
+            SELF.compPagos.imprimir_linea || '|' ||
+            SELF.compTotales.imprimir_linea || '|' ||
+            SELF.doctoRel.imprimir_linea
+        ;
+
+        IF (SELF.conceptos.COUNT > 0) THEN
+            FOR i IN SELF.conceptos.FIRST .. SELF.conceptos.LAST
+            LOOP
+                vlc_respuesta := vlc_respuesta || '|' || 
+                    SELF.conceptos(i).imprimir_linea;
+            END LOOP; 
+        END IF;
+
+        IF (SELF.impuestos_DR.COUNT > 0) THEN
+            FOR j IN SELF.impuestos_DR.FIRST .. SELF.impuestos_DR.LAST
+            LOOP
+                vlc_respuesta := vlc_respuesta || '|' || 
+                    SELF.impuestos_DR(j).imprimir_linea;
+            END LOOP; 
+        END IF;
+
+        IF (SELF.impuestos_P.COUNT > 0) THEN
+            FOR k IN SELF.impuestos_P.FIRST .. SELF.impuestos_P.LAST
+            LOOP
+                vlc_respuesta := vlc_respuesta || '|' || 
+                    SELF.impuestos_P(k).imprimir_linea;
+            END LOOP; 
+        END IF;
+
+        IF (NVL(SELF.envio_automatico.eMail, '*') != '*') THEN
+            vlc_respuesta := vlc_respuesta || '|' ||
+                SELF.envio_automatico.imprimir_linea;
+        END IF;
+
+        vlc_respuesta := vlc_respuesta || '|' || SELF.finCfdi.imprimir_linea;
+
+        RETURN vlc_respuesta;
     END imprimir_linea;
 
     -- MEMBER PROCEDURE validar IS
