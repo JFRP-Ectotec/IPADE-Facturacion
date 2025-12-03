@@ -12,10 +12,15 @@ WHERE t.tzrpofi_pidm = gb_common.f_get_pidm('A00084824')
 ORDER BY tzrpofi_doc_number DESC
 ;
 
+SELECT *
+FROM spriden
+WHERE spriden_pidm = 39522
+;
+
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084824';
-	tran_number NUMBER := 7;
+	matricula VARCHAR2(20 CHAR) := 'A00019509';
+	tran_number NUMBER := 1;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN

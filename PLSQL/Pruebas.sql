@@ -22,7 +22,13 @@ WHERE s.spriden_id = 'A00084775'
 
 SELECT *
 FROM goradid
-WHERE goradid_additional_id LIKE '%KQHL190713FW0%'
+WHERE goradid_pidm IN (104871, 104872, 104924)
+;
+
+SELECT *
+FROM spraddr
+WHERE spraddr_zip = '02080'
+	AND spraddr_atyp_code LIKE 'F%'
 ;
 
 UPDATE goradid
