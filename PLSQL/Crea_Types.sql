@@ -62,7 +62,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA AS
     RETURN VARCHAR2 IS
     BEGIN
         IF (NVL(pin_cantidad, 0) = 0) THEN
-            RETURN '';
+            RETURN '0.00';
         ELSE
             RETURN TRIM(TO_CHAR(pin_cantidad, '9999999990.00'));
         END IF;

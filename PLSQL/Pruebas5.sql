@@ -52,3 +52,57 @@ SELECT *
 FROM DBA_OBJECTS
 WHERE object_name LIKE 'TY_TRALIX%'
 ;
+
+SELECT *
+FROM tbrappl
+WHERE tbrappl_pidm = gb_common.f_get_pidm('A00019509')
+;
+
+SELECT *
+FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00019509')
+	AND tbraccd_tran_number IN (1,2)
+;
+
+SELECT *
+FROM tzrpofi
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00019509')
+;
+
+DECLARE
+	datos_banner CLOB;
+	matricula VARCHAR2(20 CHAR) := 'A00084607';
+	tran_number NUMBER := 20;
+	-- vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
+	num_linea NUMBER := 1;
+	comp_pago TY_TRALIX_COMPPAGO;
+BEGIN
+	comp_pago := TY_TRALIX_COMPPAGO(matricula, tran_number, 1, 1, '01', 'PPD');
+	dbms_output.put_line(comp_pago.imprimir_linea);
+END;
+
+
+SELECT DISTINCT s.spriden_pidm, s.spriden_id, t2.tbrappl_pay_tran_number
+FROM tzrpofi tz 
+	JOIN tbraccd t1 ON (t1.tbraccd_pidm = tz.tzrpofi_pidm
+		AND t1.tbraccd_tran_number = tz.TZRPOFI_DOCNUM_POS)
+	JOIN tbrappl t2 ON (t1.tbraccd_pidm = t2.tbrappl_pidm
+		AND t1.tbraccd_tran_number = t2.tbrappl_chg_tran_number)
+	JOIN spriden s ON (t2.tbrappl_pidm = s.spriden_pidm)
+WHERE t1.tbraccd_detail_code = 'FANT'
+	AND s.spriden_change_ind IS NULL
+;
+
+SELECT tbrappl_amount, tbrappl_chg_tran_number, tbrappl_pay_tran_number
+FROM tbrappl
+WHERE tbrappl_pidm = 104673
+	AND tbrappl_chg_tran_number = 18
+;
+
+SELECT NVL(SUM(tbrappl_amount), 0) as saldoPagado,
+                COUNT(*) as numParcialidades
+            FROM tbrappl
+            WHERE tbrappl_pidm = 104673
+                AND tbrappl_chg_tran_number = 18
+                AND tbrappl_pay_tran_number < 20
+;
