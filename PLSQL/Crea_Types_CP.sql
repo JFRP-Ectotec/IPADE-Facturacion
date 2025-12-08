@@ -22,7 +22,9 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_COMPPAGOS UNDER TY_TRALIX_LINEA
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_COMPPAGOS(
         pidm NUMBER,
         tranNumberCP NUMBER,
-        idPagos VARCHAR2
+        tranOriginal NUMBER,
+        idPagos VARCHAR2,
+        formaPago VARCHAR2
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
     MEMBER PROCEDURE validar */
@@ -32,7 +34,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_COMPPAGOS(
         pidm NUMBER,
         tranNumberCP NUMBER,
-        idPagos VARCHAR2
+        tranOriginal NUMBER,
+        idPagos VARCHAR2,
+        formaPago VARCHAR2
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
     BEGIN
@@ -45,6 +49,20 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
         SELF.versionLinea := '2.0';
 
         SELF.idPagos := idPagos;
+        SELF.FechaPago := SYSDATE;
+        SELF.FormaPagoP := formaPago;
+        SELF.MonedaP := 'MXN';
+        SELF.TipoCambioP := 1;
+
+        FOR i IN (
+            SELECT t1.tbrappl_amount
+            FROM tbrappl t1
+            WHERE t1.tbrappl_pidm = pidm
+                AND t1.tbrappl_pay_tran_number = tranNumberCP
+                AND t1.tbrappl_chg_tran_number = tranOriginal
+        ) LOOP
+            SELF.Monto := i.tbrappl_amount;
+        END LOOP;
 
         RETURN;
     END TY_TRALIX_LINEA_COMPPAGOS;
@@ -100,7 +118,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_COMPTOT UNDER TY_TRALIX_LINEA
     montoTotalPagos NUMBER,
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_COMPTOT(
         pidm NUMBER,
-        tranNumberCP NUMBER
+        tranNumberCP NUMBER,
+        tranOriginal NUMBER
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
     MEMBER PROCEDURE validar */
@@ -109,7 +128,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_COMPTOT UNDER TY_TRALIX_LINEA
 CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_COMPTOT(
         pidm NUMBER,
-        tranNumberCP NUMBER
+        tranNumberCP NUMBER,
+        tranOriginal NUMBER
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
     BEGIN
@@ -118,6 +138,32 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
 
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
+
+        SELF.totRetencionesIVA := 0;
+        SELF.totRetencionesISR := 0;
+        SELF.totRetencionesIEPS := 0;
+        SELF.totTrasladosBaseIVA8 := 0;
+        SELF.totTrasladosImpIVA8 := 0;
+        SELF.totTrasladosBaseIVA0 := 0;
+        SELF.totTrasladosImpIVA0 := 0;
+        SELF.totTrasladosBaseIVAEx := 0;
+
+        FOR i IN (
+            SELECT tbrappl_amount
+            FROM tbrappl
+            WHERE tbrappl_pidm = pidm
+                AND tbrappl_pay_tran_number = tranNumberCP
+                AND tbrappl_chg_tran_number = tranOriginal
+        ) LOOP
+            SELF.totTrasladosBaseIVA16 := i.tbrappl_amount;
+            SELF.totTrasladosImpIVA16 := i.tbrappl_amount * 0.16;
+        END LOOP;
+
+        SELF.montoTotalPagos := NVL(SELF.totTrasladosBaseIVA16, 0)
+            + NVL(SELF.totTrasladosBaseIVA8, 0)
+            + NVL(SELF.totTrasladosBaseIVA0, 0)
+            + NVL(SELF.totTrasladosBaseIVAEx, 0)
+        ;
 
         RETURN;
     END TY_TRALIX_LINEA_COMPTOT;
@@ -169,6 +215,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_COMPDOCTREL UNDER TY_TRALIX_LINEA
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_COMPDOCTREL(
         pidm NUMBER,
         tranNumberCP NUMBER,
+        tranOriginal NUMBER,
         idPagos VARCHAR2
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
@@ -179,10 +226,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_COMPDOCTREL(
         pidm NUMBER,
         tranNumberCP NUMBER,
+        tranOriginal NUMBER,
         idPagos VARCHAR2
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
-        tranOriginal tbrappl.tbrappl_chg_tran_number%TYPE;
         saldoPagado NUMBER;
         numParcialidades NUMBER;
     BEGIN
@@ -197,15 +244,13 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
         SELF.objetoImpDR := '002';
 
         FOR i IN (
-            SELECT tbrappl_amount, tbrappl_chg_tran_number
+            SELECT tbrappl_amount
             FROM tbrappl
             WHERE tbrappl_pidm = pidm
                 AND tbrappl_pay_tran_number = tranNumberCP
-            ORDER BY tbrappl_chg_tran_number DESC
+                AND tbrappl_chg_tran_number = tranOriginal
         ) LOOP
             SELF.impPagado := i.tbrappl_amount;
-            tranOriginal := i.tbrappl_chg_tran_number;
-            EXIT;
         END LOOP;
 
         dbms_output.put_line('impPagado 1:'||SELF.impPagado);
@@ -237,9 +282,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
             SELF.numParcialidad := m.numParcialidades + 1;
         END LOOP;
 
-        IF (SELF.numParcialidad > 1) THEN
+        -- IF (SELF.numParcialidad > 1) THEN
             SELF.impSaldoInsoluto := SELF.impSaldoAnt - SELF.impPagado;
-        END IF;
+        -- END IF;
 
         FOR k IN (
             SELECT TZRPOFI_IAC_CDE, TZRPOFI_SDOC_CODE
@@ -299,7 +344,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_IMP_CP UNDER TY_TRALIX_LINEA
         tipoFactura VARCHAR2, -- DR (original) o P (complemento)
         pidm NUMBER,
         idPagos VARCHAR2,
-        tranNumberCP NUMBER
+        monto NUMBER
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
     MEMBER PROCEDURE validar */
@@ -310,7 +355,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
         tipoFactura VARCHAR2,
         pidm NUMBER,
         idPagos VARCHAR2,
-        tranNumberCP NUMBER
+        monto NUMBER
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
     BEGIN
@@ -321,6 +366,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
         SELF.sep := parent.sep;
 
         SELF.idPagos := idPagos;
+        SELF.baseDR := monto;
+        SELF.impuestoDR := '002';
+        SELF.tipoFactorDR := 'Tasa';
+        SELF.tasaCuotaDR := 0.16;
+        SELF.importeDR := SELF.baseDR * SELF.tasaCuotaDR;
 
         RETURN;
     END TY_TRALIX_LINEA_IMP_CP;
@@ -332,7 +382,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
             SELF.format_moneda(SELF.baseDR) || SELF.sep ||
             SELF.impuestoDR || SELF.sep ||
             SELF.tipoFactorDR || SELF.sep ||
-            TO_CHAR(SELF.tasaCuotaDR, '0.009999') || SELF.sep ||
+            TRIM(TO_CHAR(SELF.tasaCuotaDR, '0.009999')) || SELF.sep ||
             SELF.format_moneda(SELF.importeDR)
         ;
     END imprimir_linea;
@@ -371,6 +421,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_COMPPAGO AS OBJECT
     CONSTRUCTOR FUNCTION TY_TRALIX_COMPPAGO(
         matricula VARCHAR2,
         tranNumber NUMBER,
+        tranOriginal NUMBER,
         numEntidad VARCHAR2,
         difEmpresa VARCHAR2,
         formaPago VARCHAR2,
@@ -384,6 +435,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
     CONSTRUCTOR FUNCTION TY_TRALIX_COMPPAGO(
         matricula VARCHAR2,
         tranNumber NUMBER,
+        tranOriginal NUMBER,
         numEntidad VARCHAR2,
         difEmpresa VARCHAR2,
         formaPago VARCHAR2,
@@ -392,6 +444,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         idPagos VARCHAR2(50 CHAR);
         vln_pidm SPRIDEN.SPRIDEN_PIDM%TYPE;
         numLineas NUMBER := 0;
+        concepto TY_TRALIX_LINEA_05;
     BEGIN
         idPagos := matricula || '_' || TRIM(TO_CHAR(tranNumber, '000000'));
         vln_pidm := gb_common.f_get_pidm(matricula);
@@ -399,11 +452,15 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         numLineas := numLineas + 1;
 
         SELF.envio_automatico := ty_tralix_linea_09(matricula);
-        -- numLineas := numLineas + 1;
-
+        IF (NVL(SELF.envio_automatico.eMail, '*') != '*') THEN
+            numLineas := numLineas + 1;
+        END IF;
+        
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, 
             numEntidad, difEmpresa, metodoPago, formaPago);
         SELF.info_gral_comprobante.metodoPago := '';
+        SELF.info_gral_comprobante.formaPago := '';
+        SELF.info_gral_comprobante.tipoComprobante := 'P';
         numLineas := numLineas + 1;
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
 
@@ -414,18 +471,51 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
         numLineas := numLineas + 1;
 
-        SELF.compPagos := TY_TRALIX_LINEA_COMPPAGOS(vln_pidm, tranNumber, idPagos);
+        SELF.compPagos := TY_TRALIX_LINEA_COMPPAGOS(vln_pidm, tranNumber, tranOriginal, idPagos, formaPago);
         numLineas := numLineas + 1;
 
-        SELF.compTotales := TY_TRALIX_LINEA_COMPTOT(vln_pidm, tranNumber);
+        SELF.compTotales := TY_TRALIX_LINEA_COMPTOT(vln_pidm, tranNumber, tranOriginal);
         numLineas := numLineas + 1;
 
-        SELF.doctoRel := TY_TRALIX_LINEA_COMPDOCTREL(vln_pidm, tranNumber, idPagos);
+        SELF.doctoRel := TY_TRALIX_LINEA_COMPDOCTREL(vln_pidm, tranNumber, tranOriginal, idPagos);
         numLineas := numLineas + 1;
 
         SELF.conceptos := TY_TRALIX_ARR_05();
+        -- SELF.conceptos.EXTEND;
+        FOR j IN (
+            SELECT tbraccd_amount, tbraccd_receipt_number,
+                tbraccd_detail_code
+            FROM tbraccd
+            WHERE tbraccd_pidm = vln_pidm
+                AND tbraccd_tran_number = tranNumber
+        ) LOOP
+            /* Buscar impuestos */
+            -- SELECT NVL(SUM(tbraccd_amount), 0),
+            --     MAX(tbraccd_detail_code)
+            -- INTO vln_sumaImpuestos,
+            --     vlc_detalleImp
+            -- FROM tbraccd
+            -- WHERE tbraccd_pidm = pidm
+            --     AND tbraccd_tran_number != tranNumber
+            --     AND tbraccd_receipt_number = j.tbraccd_receipt_number
+            --     AND tbraccd_srce_code = 'Z';
+
+            concepto := TY_TRALIX_LINEA_05(vln_pidm, tranNumber);
+            concepto.claveUnidad := 'ACT';  -- Revisar si es el deber ser. TEMPORAL
+            -- Considerar modifcar concepto.importe
+            
+            SELF.conceptos.EXTEND;
+            SELF.conceptos(SELF.conceptos.COUNT) := concepto;
+        END LOOP;
+
         SELF.impuestos_DR := TY_TRALIX_ARR_IMP_CP();
+        SELF.impuestos_DR.EXTEND;
+        SELF.impuestos_DR(SELF.impuestos_DR.COUNT) := TY_TRALIX_LINEA_IMP_CP('DR', vln_pidm, idPagos, SELF.doctorel.impSaldoAnt);
+
         SELF.impuestos_P := TY_TRALIX_ARR_IMP_CP();
+        SELF.impuestos_P.EXTEND;
+        SELF.impuestos_P(SELF.impuestos_P.COUNT) := TY_TRALIX_LINEA_IMP_CP('P', vln_pidm, idPagos, SELF.compTotales.montoTotalPagos);
+
         SELF.errores := TY_TRALIX_ARR_ERROR();
 
         numLineas := numLineas + SELF.conceptos.COUNT
@@ -445,12 +535,6 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             SELF.receptor.imprimir_linea
         ;
 
-        vlc_respuesta := vlc_respuesta || '|' ||
-            SELF.compPagos.imprimir_linea || '|' ||
-            SELF.compTotales.imprimir_linea || '|' ||
-            SELF.doctoRel.imprimir_linea
-        ;
-
         IF (SELF.conceptos.COUNT > 0) THEN
             FOR i IN SELF.conceptos.FIRST .. SELF.conceptos.LAST
             LOOP
@@ -458,6 +542,12 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
                     SELF.conceptos(i).imprimir_linea;
             END LOOP; 
         END IF;
+
+        vlc_respuesta := vlc_respuesta || '|' ||
+            SELF.compPagos.imprimir_linea || '|' ||
+            SELF.compTotales.imprimir_linea || '|' ||
+            SELF.doctoRel.imprimir_linea
+        ;
 
         IF (SELF.impuestos_DR.COUNT > 0) THEN
             FOR j IN SELF.impuestos_DR.FIRST .. SELF.impuestos_DR.LAST

@@ -61,8 +61,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA AS
     MEMBER FUNCTION FORMAT_MONEDA(pin_cantidad NUMBER) 
     RETURN VARCHAR2 IS
     BEGIN
-        IF (NVL(pin_cantidad, 0) = 0) THEN
-            RETURN '0.00';
+        IF (pin_cantidad = 0) THEN
+            RETURN '0';
+        ELSIF (NVL(pin_cantidad, 0) = 0) THEN
+            RETURN '';
         ELSE
             RETURN TRIM(TO_CHAR(pin_cantidad, '9999999990.00'));
         END IF;
