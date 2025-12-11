@@ -252,10 +252,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
     MEMBER PROCEDURE set_cargos(cargos NUMBER, imp_ret NUMBER) IS
     BEGIN
         self.taxesTrasladados := imp_ret;
-        self.descuento := 0;
-        self.taxesRetenidos := 0;
+        self.descuento := NULL;
+        self.taxesRetenidos := NULL;
         self.subTotalNum := cargos;
-        self.totalNum := cargos - self.descuento + self.taxesTrasladados + self.taxesRetenidos;
+        self.totalNum := cargos - NVL(self.descuento, 0) + NVL(self.taxesTrasladados, 0) 
+            + NVL(self.taxesRetenidos, 0);
         SELF.tipoCambio := 1;
     END set_cargos;
 
@@ -441,6 +442,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_03 UNDER TY_TRALIX_LINEA
     numEntidad VARCHAR2(1 CHAR),
 
     esPubGral VARCHAR2(10 CHAR),
+    numGrupo VARCHAR2(1 CHAR),
+    tipoDir VARCHAR2(10 CHAR),
 
     /* TODO: Agregar parametro que indique se va a construir como PubGral */
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_03(
@@ -507,6 +510,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
         ) LOOP
             SELF.rfc := REPLACE(j.goradid_additional_id, '*', '');
             numGrupo := SUBSTR(j.goradid_adid_code, 1, 1);
+            SELF.numGrupo := numGrupo;
             EXIT;
         END LOOP;
 
@@ -593,18 +597,19 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
             SELF.estado := i.stvstat_desc;
             SELF.municipio := i.stvcnty_desc;
             SELF.domFiscal := i.spraddr_zip;
+            SELF.tipoDir := i.spraddr_atyp_code || '|' || sp.spraddr_seq_no;
             EXIT;
         END LOOP;
 
         IF (NVL(SELF.calle, '|') = '|') THEN
-            SELF.calle := 'CAIRO';
-            SELF.numExterior := '2';
+            -- SELF.calle := 'CAIRO';
+            -- SELF.numExterior := '2';
             -- SELF.numInterior := i.spraddr_house_number;
             -- SELF.colonia := i.spraddr_street_line3;
             -- SELF.localidad := i.spraddr_city;
             -- SELF.referencia := i.spraddr_street_line4;
             -- SELF.estado := i.stvstat_desc;
-            SELF.municipio := 'CIUDAD DE MÉXICO';
+            -- SELF.municipio := 'CIUDAD DE MÉXICO';
             SELF.domFiscal := '02080';
         END IF;
 
@@ -1025,6 +1030,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_06 AS
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
 
+        dbms_output.put_line('clave_impuesto:'||clave_impuesto);
+
         IF clave_impuesto LIKE '%IVA' THEN
             SELF.clave_impuesto := '002';
         ELSIF clave_impuesto LIKE '%ISR' THEN
@@ -1339,6 +1346,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, numEntidad, 
             difEmpresa, metodoPago, formaPago);
+        IF (SELF.info_gral_comprobante.descuento = 0) THEN
+        END IF; 
         numLineas := numLineas + 1;
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
 
@@ -1592,7 +1601,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
                 totalCargos := totalCargos + vln_subTotal;
 
-                vlc_detalleImp := j.tbraccd_detail_code;
+                -- vlc_detalleImp := j.tbraccd_detail_code;
+                vlc_detalleImp := 'IVA';    /* TEMPORAL */
 
                 impuestoTras := TY_TRALIX_LINEA_06(
                     vlc_detalleImp, 

@@ -24,6 +24,7 @@ VALUES('MICROSERV', 'INTG_IPADE', '', '', 4,
 'WALLET_L', 'ruta de wallet', '', SYSDATE, 'ECTOTEC_USER', 
 'S', 'microservicio', '/opt/oracle/dcs/commonstore/wallets/DBTEST_vtq_qro/cert', 'Integración Tralix');
 
+-----------------
 
 INSERT INTO "GENERAL".GTVSDAX
 (GTVSDAX_EXTERNAL_CODE, GTVSDAX_INTERNAL_CODE, GTVSDAX_REPORTING_DATE, GTVSDAX_TRANSLATION_CODE, GTVSDAX_INTERNAL_CODE_SEQNO, 

@@ -19,12 +19,12 @@ WHERE spriden_pidm = 39522
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00019509';
-	tran_number NUMBER := 1;
+	matricula VARCHAR2(20 CHAR) := 'A00084911';
+	tran_number NUMBER := 3;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PUE');
+	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PPD');
 	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
@@ -129,3 +129,8 @@ BEGIN
 	linea := TY_TRALIX_LINEA_99(10);
 	dbms_output.put_line(linea.format_moneda(0));
 END;
+
+SELECT *
+FROM tvvtsta
+WHERE tvvtsta_desc LIKE '%RAZÓN%'
+;

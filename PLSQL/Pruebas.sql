@@ -170,15 +170,23 @@ WHERE object_name = 'TZKSFIP'
 ;
 
 
+SELECT t.tzrpofi_activity_date
+FROM tzrpofi t JOIN spriden s ON (t.tzrpofi_pidm = s.spriden_pidm)
+WHERE s.spriden_id = 'A00084606'
+	AND s.spriden_change_ind IS NULL
+	AND t.tzrpofi_docnum_pos = 81
+ORDER BY t.tzrpofi_doc_number DESC
+;
+
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00010493';
-	tran_number NUMBER := 15;
+	matricula VARCHAR2(20 CHAR) := 'A00084606';
+	tran_number NUMBER := 81;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	-- vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
-	vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
+	vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
+	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
 	IF (vlt_respuesta.errores.COUNT > 0) THEN
@@ -243,12 +251,7 @@ FROM GTVSDAX
       WHERE gtvsdax_external_code = 'MICROSERV'
 ;
 
-SELECT t.*
-FROM tzrpofi t JOIN spriden s ON (t.tzrpofi_pidm = s.spriden_pidm)
-WHERE s.spriden_id = 'A00084858'
-	AND s.spriden_change_ind IS NULL
-ORDER BY t.tzrpofi_doc_number DESC
-;
+
 
 SELECT * /* t.TVRFWTX_FW_AMOUNT,
               t.TVRFWTX_FW_DETAIL_CODE */
