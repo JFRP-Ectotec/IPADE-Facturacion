@@ -19,8 +19,8 @@ WHERE spriden_pidm = 39522
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084911';
-	tran_number NUMBER := 3;
+	matricula VARCHAR2(20 CHAR) := 'A00084925';
+	tran_number NUMBER := 15;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -60,13 +60,17 @@ WHERE tbrappl_pidm = gb_common.f_get_pidm('A00019509')
 
 SELECT *
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00019509')
-	AND tbraccd_tran_number IN (1,2)
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084925')
 ;
 
-SELECT *
+SELECT tzrpofi_doc_number, tzrpofi_iac_cde, tzrpofi_activity_date
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00019509')
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00084927')
+;
+
+SELECT tvrpays_pidm, tvrpays_return_code, tvrpays_return_code_desc
+FROM tvrpays
+WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084925')
 ;
 
 DECLARE
@@ -133,4 +137,8 @@ END;
 SELECT *
 FROM tvvtsta
 WHERE tvvtsta_desc LIKE '%RAZÓN%'
+;
+
+SELECT sysdate - 6/24
+FROM dual
 ;

@@ -227,7 +227,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
         ) LOOP
             SELF.totalNum := i.tbraccd_amount;
             SELF.totalLetra := GZKNUMB.monto_escrito(SELF.totalNum);
-            SELF.fecha := i.tbraccd_effective_date;
+            SELF.fecha := i.tbraccd_effective_date - 6/24;
         END LOOP;
 
         FOR j IN (
