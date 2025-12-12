@@ -30,8 +30,6 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         vlc_respuesta VARCHAR2(2 CHAR);
         vlc_tipoCodigo tvrtsta.tvrtsta_tsta_code%TYPE;
     BEGIN
-        dbms_output.put_line('pidm:'||pidm||' tranNumber:'||tran_number);
-
         SELECT NVL(MAX(tvrtsta_tsta_code), '|')
         INTO vlc_tipoCodigo
         FROM tvrtsta
@@ -94,12 +92,8 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         WHERE tvrtsta_pidm = pidm
             AND tvrtsta_tran_number = tran_number;
 
-        dbms_output.put_line('Zona 2.');
-
         vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number);  
         vln_secuencial := vln_secuencial + 1;
-
-        dbms_output.put_line('Primer registro.');
 
         vlc_respCall := fn_insertar_tvrtsta(
             pidm, tran_number, vln_secuencial,
@@ -109,8 +103,6 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
             ROLLBACK;
             RETURN vlc_respCall;
         END IF;
-
-        dbms_output.put_line('Segundo registro.');
 
         vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
@@ -136,8 +128,6 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         --     RETURN vlc_respCall;
         -- END IF;
 
-        dbms_output.put_line('Tercer registro.');
-
         vlc_seqCodigo := SUBSTR(vlc_seqCodigo, 2, 1);
 
         vln_secuencial := vln_secuencial + 1;
@@ -150,8 +140,6 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
             RETURN vlc_respCall;
         END IF;
 
-        dbms_output.put_line('Cuarto registro.');
-
         vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
             pidm, tran_number, vln_secuencial,
@@ -161,8 +149,6 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
             ROLLBACK;
             RETURN vlc_respCall;
         END IF;
-
-        dbms_output.put_line('Quinto registro.');
 
         vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
@@ -178,8 +164,6 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
             vlc_seqCodigo := '5';
         END IF;
 
-        dbms_output.put_line('Sexto registro.');
-
         vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
             pidm, tran_number, vln_secuencial,
@@ -189,8 +173,6 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
             ROLLBACK;
             RETURN vlc_respCall;
         END IF;
-
-        dbms_output.put_line('Septimo registro.');
 
         vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(

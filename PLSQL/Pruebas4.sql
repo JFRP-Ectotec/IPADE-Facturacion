@@ -317,11 +317,11 @@ WHERE g1.gzvprmd_prmh_code = 'FACTPAYLINEA'
 ;
 
 DECLARE
-	datos_banner CLOB;
+	-- datos_banner CLOB;
 	matricula_orig VARCHAR2(20 CHAR) := 'PUBGRAL1';
-	tran_number_orig NUMBER := 142;
-    matricula_new VARCHAR2(20 CHAR) := 'A00084798';
-	tran_number_new NUMBER := 81;
+	tran_number_orig NUMBER := 180;
+    matricula_new VARCHAR2(20 CHAR) := 'PUBGRAL1';
+	tran_number_new NUMBER := 178;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN

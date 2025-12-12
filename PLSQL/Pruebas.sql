@@ -22,7 +22,13 @@ WHERE s.spriden_id = 'A00084775'
 
 SELECT *
 FROM goradid
-WHERE goradid_additional_id LIKE '%KQHL190713FW0%'
+WHERE goradid_pidm IN (104871, 104872, 104924)
+;
+
+SELECT *
+FROM spraddr
+WHERE spraddr_zip = '02080'
+	AND spraddr_atyp_code LIKE 'F%'
 ;
 
 UPDATE goradid
@@ -78,7 +84,7 @@ WHERE s.spriden_id = 'A00084596'
 SELECT t.*
 FROM TZRPOFI t JOIN spriden s
 	ON (t.tzrpofi_pidm = s.spriden_pidm)
-WHERE s.spriden_id = 'A00084635'
+WHERE s.spriden_id = 'A00010493'
 	AND s.spriden_change_ind IS NULL
 ORDER BY t.tzrpofi_doc_number
 ;
@@ -140,15 +146,19 @@ WHERE s.spriden_id = 'A00084607'
     AND t.tbrappl_pay_tran_number = 46
 ;
 
-SELECT *
-FROM tzrpofi
-WHERE tzrpofi_iac_cde LIKE '81D31E%'
+SELECT t.*
+FROM tzrpofi t JOIN tbraccd t2
+	ON (t.tzrpofi_pidm = t2.tbraccd_pidm
+		AND t.tzrpofi_docnum_pos = t2.tbraccd_tran_number)
+WHERE t.tzrpofi_iac_cde IS NOT NULL
+	AND t2.tbraccd_detail_code = 'FANT'
+	AND t.tzrpofi_pidm = gb_common.f_get_pidm('A00084824')
 ;
 
+A000
+
 SELECT *
-FROM tbbacct
-WHERE tbbacct_pidm = 104673
-	-- AND tbbacct_bill_code = 'NO'
+FROM tbraccd
 ;
 
 SELECT SUBSTR('PUBGRAL1', 8, 1)
@@ -160,15 +170,23 @@ WHERE object_name = 'TZKSFIP'
 ;
 
 
+SELECT t.tzrpofi_activity_date
+FROM tzrpofi t JOIN spriden s ON (t.tzrpofi_pidm = s.spriden_pidm)
+WHERE s.spriden_id = 'A00084606'
+	AND s.spriden_change_ind IS NULL
+	AND t.tzrpofi_docnum_pos = 81
+ORDER BY t.tzrpofi_doc_number DESC
+;
+
 DECLARE
 	datos_banner CLOB;
 	matricula VARCHAR2(20 CHAR) := 'A00084606';
-	tran_number NUMBER := 85;
+	tran_number NUMBER := 81;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	-- vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
-	vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
+	vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
+	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
 	IF (vlt_respuesta.errores.COUNT > 0) THEN
@@ -186,8 +204,8 @@ FROM dual;
 
 SELECT tvrpays_pidm, tvrpays_return_code, tvrpays_return_code_desc
 FROM tvrpays
-WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084606')
-	AND tvrpays_return_code = 108
+WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084858')
+	-- AND tvrpays_return_code = 108
 ORDER BY tvrpays_activity_date DESC
 ;
 
@@ -223,12 +241,17 @@ WHERE s.spriden_id = 'A00084666'
 	AND s.spriden_change_ind IS NULL
 ;
 
-SELECT t.*
-FROM tzrpofi t JOIN spriden s ON (t.tzrpofi_pidm = s.spriden_pidm)
-WHERE s.spriden_id = 'A00084607'
-	AND s.spriden_change_ind IS NULL
-ORDER BY t.tzrpofi_doc_number DESC
+SELECT *
+FROM gtvsdax
+WHERE GTVSDAX_COMMENTS LIKE '%wallets%'
 ;
+
+SELECT *
+FROM GTVSDAX
+      WHERE gtvsdax_external_code = 'MICROSERV'
+;
+
+
 
 SELECT * /* t.TVRFWTX_FW_AMOUNT,
               t.TVRFWTX_FW_DETAIL_CODE */
@@ -436,3 +459,4 @@ WHERE object_name LIKE 'TY_TRALIX%'
 
 SELECT TRIM(TO_CHAR(13.79, '9999999990.00'))
 FROM dual;
+
