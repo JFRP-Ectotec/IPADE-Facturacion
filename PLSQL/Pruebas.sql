@@ -180,7 +180,7 @@ ORDER BY t.tzrpofi_doc_number DESC
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084606';
+	matricula VARCHAR2(20 CHAR) := 'A00084933';
 	tran_number NUMBER := 81;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;

@@ -207,6 +207,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
         self.formaPago := formaPago;
 
         -- dbms_output.put_line('numEntidad:'||numEntidad);
+        dbms_output.put_line('numEntidad:'||difEmpresa);
 
         FOR q IN (
             SELECT sr.spraddr_zip
@@ -583,8 +584,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
                 LEFT JOIN stvcnty sy ON (sp.spraddr_cnty_code = sy.stvcnty_code)
                 LEFT JOIN stvnatn sn ON (sp.spraddr_natn_code = sn.stvnatn_code)
             WHERE sp.spraddr_pidm = pidm
-                -- AND spraddr_atyp_code = 'F' || num_entidad
-                AND sp.spraddr_atyp_code LIKE 'F%'
+                AND spraddr_atyp_code = 'F' || SELF.numGrupo
+                -- AND sp.spraddr_atyp_code LIKE 'F%'
             ORDER BY sp.spraddr_atyp_code DESC, sp.spraddr_activity_date DESC
         ) LOOP
             SELF.pais := i.stvnatn_nation;
@@ -597,7 +598,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
             SELF.estado := i.stvstat_desc;
             SELF.municipio := i.stvcnty_desc;
             SELF.domFiscal := i.spraddr_zip;
-            SELF.tipoDir := i.spraddr_atyp_code || '|' || sp.spraddr_seq_no;
+            SELF.tipoDir := i.spraddr_atyp_code || '|' || i.SPRADDR_SEQNO;
             EXIT;
         END LOOP;
 
@@ -1346,8 +1347,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, numEntidad, 
             difEmpresa, metodoPago, formaPago);
-        IF (SELF.info_gral_comprobante.descuento = 0) THEN
-        END IF; 
+        -- IF (SELF.info_gral_comprobante.descuento = 0) THEN
+        -- END IF; 
         numLineas := numLineas + 1;
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
 

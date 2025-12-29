@@ -19,12 +19,33 @@ WHERE spriden_pidm = 39522
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084925';
-	tran_number NUMBER := 15;
+	matricula VARCHAR2(20 CHAR) := 'A00084966';
+	tran_number NUMBER := 19;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
 	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PPD');
+	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
+	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
+	--IF (vlt_respuesta.estatus != 'OK') THEN
+	IF (vlt_respuesta.errores.COUNT > 0) THEN
+		dbms_output.put_line(vlt_respuesta.errores.COUNT || ' errores');
+		FOR m IN vlt_respuesta.errores.FIRST .. vlt_respuesta.errores.LAST
+		LOOP
+			dbms_output.put_line(num_linea || ' - ' ||vlt_respuesta.errores(m).mensaje);
+			num_linea := num_linea + 1;
+		END LOOP;
+	END IF;
+END;
+
+DECLARE
+	datos_banner CLOB;
+	matricula VARCHAR2(20 CHAR) := 'A00084966';
+	tran_number NUMBER := 19;
+	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
+	num_linea NUMBER := 1;
+BEGIN
+	vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
 	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
@@ -54,23 +75,60 @@ WHERE object_name LIKE 'TY_TRALIX%'
 ;
 
 SELECT *
+FROM spraddr 
+WHERE spraddr_pidm = gb_common.f_get_pidm('A00084966')
+;
+
+SELECT s.spriden_id, g.*
+FROM goradid g JOIN spriden s ON (g.goradid_pidm = s.spriden_pidm)
+WHERE s.spriden_id IN ('A00084966', 'A00084933')
+	AND g.goradid_adid_code LIKE '1RS%'
+	AND s.spriden_change_ind IS NULL
+ORDER BY s.spriden_id, g.goradid_adid_code
+;
+
+UPDATE goradid
+SET goradid_additional_id = 'IPA220921UB9'
+WHERE goradid_pidm = gb_common.f_get_pidm('A00084966')
+	AND goradid_adid_code = '1RFC'
+;
+
+UPDATE goradid
+SET goradid_additional_id = '*SPE661112KJ4'
+WHERE goradid_pidm = gb_common.f_get_pidm('A00084966')
+	AND goradid_adid_code = '2RFC'
+;
+
+COMMIT;
+
+SELECT *
 FROM tbrappl
-WHERE tbrappl_pidm = gb_common.f_get_pidm('A00019509')
+WHERE tbrappl_pidm = gb_common.f_get_pidm('A00084933')
+;
+
+SELECT t.tbraccd_pidm, t.tbraccd_tran_number, t.tbraccd_detail_code,
+  t.tbraccd_receipt_number, t.tbraccd_amount
+FROM tbraccd t
+WHERE t.tbraccd_pidm = gb_common.f_get_pidm('A00084933')
 ;
 
 SELECT *
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084925')
+Where tbraccd_pidm = gb_common.f_get_pidm('A00084933')
+	and tbraccd_tran_number != 35
+	AND tbraccd_receipt_number = 811
 ;
 
-SELECT tzrpofi_doc_number, tzrpofi_iac_cde, tzrpofi_activity_date
+SELECT tzrpofi_docnum_pos, tzrpofi_doc_number, tzrpofi_iac_cde, 
+	tzrpofi_activity_date - 6/24
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00084927')
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00084933')
 ;
 
-SELECT tvrpays_pidm, tvrpays_return_code, tvrpays_return_code_desc
+SELECT tvrpays_pidm, tvrpays_return_code, tvrpays_return_code_desc, 
+	tvrpays_activity_date - 6/24
 FROM tvrpays
-WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084925')
+WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084933')
 ;
 
 DECLARE
@@ -141,4 +199,14 @@ WHERE tvvtsta_desc LIKE '%RAZÓN%'
 
 SELECT sysdate - 6/24
 FROM dual
+;
+
+SELECT *
+FROM spraddr
+WHERE spraddr_pidm = gb_common.f_get_pidm('A00084933')
+;
+
+SELECT *
+FROM goradid
+WHERE goradid_pidm = gb_common.f_get_pidm('A00084933')
 ;
