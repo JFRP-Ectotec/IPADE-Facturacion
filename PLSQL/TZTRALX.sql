@@ -535,6 +535,15 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         -- dbms_output.put_line('num_tipoDir:'||vlc_num_tipoDir);
         dbms_output.put_line('num_entidad:'||vlc_num_entidad);
 
+        IF (NVL(vlc_num_entidad, '|') = '|') THEN
+            -- pr_log_error(vln_pidm, '', 'La carrera del alumno no está registrada con etiqueta IPADEEM en SOAXREF',
+            --     vln_monto, tipo_pago_banner, tran_number);
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.errores.EXTEND;
+            vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('La carrera del alumno no está registrada con etiqueta IPADEEM en SOAXREF');
+            RETURN vlt_respuesta;
+        END IF;
+
         vlc_tipo_pago_banner := tipo_pago_banner;
         IF (tipo_pago_facturar = 'PPD') THEN
             vlc_tipo_pago_banner := '99';

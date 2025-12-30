@@ -1,7 +1,7 @@
 SELECT t.tbraccd_tran_number, t.tbraccd_detail_code,
     t.tbraccd_amount
 FROM tbraccd t
-WHERE t.tbraccd_pidm = gb_common.f_get_pidm('A00084824')
+WHERE t.tbraccd_pidm = gb_common.f_get_pidm('A00084755')
 ORDER BY t.tbraccd_tran_number
 ;
 
@@ -17,10 +17,33 @@ FROM spriden
 WHERE spriden_pidm = 39522
 ;
 
+SELECT *
+FROM sovlcur
+WHERE sovlcur_pidm = gb_common.f_get_pidm('A00084970')
+;
+
+SELECT c.stvcamp_dicd_code,
+	substr(x1.sorxref_edi_qlfr, 3, 1) as empresa,
+	vr.sovlcur_program
+FROM sovlcur vr 
+	JOIN spriden sp ON (vr.sovlcur_pidm = sp.spriden_pidm)
+	JOIN stvcamp c ON (vr.sovlcur_camp_code = c.stvcamp_code)
+	LEFT JOIN sorxref x1 ON (vr.sovlcur_program = x1.sorxref_banner_value)
+WHERE sp.spriden_id = 'A00084970'
+	AND sp.spriden_change_ind IS NULL
+	-- AND vr.sovlcur_lmod_code = sb_curriculum_str.f_learner
+	-- and x1.sorxref_xlbl_code = 'IPADEEM'
+;
+
+SELECT *
+FROM sorxref
+WHERE sorxref_banner_value = 'CAAD2'
+;
+
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084966';
-	tran_number NUMBER := 19;
+	matricula VARCHAR2(20 CHAR) := 'A00084970';
+	tran_number NUMBER := 3;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -40,8 +63,8 @@ END;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084966';
-	tran_number NUMBER := 19;
+	matricula VARCHAR2(20 CHAR) := 'A00084755';
+	tran_number NUMBER := 73;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -109,7 +132,13 @@ WHERE tbrappl_pidm = gb_common.f_get_pidm('A00084933')
 SELECT t.tbraccd_pidm, t.tbraccd_tran_number, t.tbraccd_detail_code,
   t.tbraccd_receipt_number, t.tbraccd_amount
 FROM tbraccd t
-WHERE t.tbraccd_pidm = gb_common.f_get_pidm('A00084933')
+WHERE t.tbraccd_pidm = gb_common.f_get_pidm('A00084970')
+;
+
+SELECT *
+FROM tbrappl
+WHERE tbrappl_pidm = gb_common.f_get_pidm('A00084755')
+	AND tbrappl_pay_tran_number = 73
 ;
 
 SELECT *
@@ -122,13 +151,14 @@ Where tbraccd_pidm = gb_common.f_get_pidm('A00084933')
 SELECT tzrpofi_docnum_pos, tzrpofi_doc_number, tzrpofi_iac_cde, 
 	tzrpofi_activity_date - 6/24
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00084933')
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00084969')
 ;
 
 SELECT tvrpays_pidm, tvrpays_return_code, tvrpays_return_code_desc, 
 	tvrpays_activity_date - 6/24
 FROM tvrpays
-WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084933')
+WHERE tvrpays_pidm = gb_common.f_get_pidm('A00084967')
+	-- AND tvrpays_return_code = 4
 ;
 
 DECLARE
@@ -209,4 +239,9 @@ WHERE spraddr_pidm = gb_common.f_get_pidm('A00084933')
 SELECT *
 FROM goradid
 WHERE goradid_pidm = gb_common.f_get_pidm('A00084933')
+;
+
+SELECT sorxref_banner_value
+FROM sorxref
+WHERE sorxref_xlbl_code = 'IMPUESTO'
 ;

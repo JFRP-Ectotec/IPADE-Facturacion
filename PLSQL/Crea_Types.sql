@@ -768,7 +768,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_05 UNDER TY_TRALIX_LINEA
     ) RETURN SELF AS RESULT,
     MEMBER PROCEDURE set_objetoImp(cObjetoImp VARCHAR2),
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
-    MEMBER PROCEDURE validar
+    MEMBER PROCEDURE validar,
+    MEMBER FUNCTION desplegar_programa(pidm NUMBER, tranNUmber NUMBER) RETURN VARCHAR2
 );
 
 CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
@@ -779,6 +780,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
         parent TY_TRALIX_LINEA;
         cantidadTotal TBRACCD.TBRACCD_AMOUNT%TYPE;
         totImpuestos  TBRACCD.TBRACCD_AMOUNT%TYPE;
+        descTemporal  VARCHAR2(300 CHAR);
     BEGIN
         SELECT self INTO parent FROM dual;
         parent.INIT('05');
@@ -806,8 +808,16 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
             SELF.descripcion := 'Capacitación '||k.smrprle_program_desc;
         END LOOP;
 
+       
+
         IF NVL(SELF.descripcion, '|') = '|' THEN
             SELF.descripcion := 'Capacitación';
+        ELSE
+             /* Localizar que transacción pagó, y si es determinado tipo le cambia SELF.descripcion */  
+            descTemporal := desplegar_programa(pidm, tranNumber);
+            IF descTemporal != '|' THEN
+                SELF.descripcion := descTemporal;
+            END IF;
         END IF;
 
         FOR i IN (
@@ -891,6 +901,32 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
             SELF.AGREGAR_ERROR('Debe haber un objeto de importación.');
         END IF;
     END validar;
+
+    MEMBER FUNCTION desplegar_programa(pidm NUMBER, tranNUmber NUMBER) RETURN VARCHAR2 IS
+        vlc_respuesta tbbdetc.tbbdetc_desc%TYPE := '|';
+        vlc_codigo_tranOrig tbraccd.tbraccd_detail_code%TYPE;
+    BEGIN
+        FOR i IN (
+            SELECT t1.TBRAPPL_CHG_TRAN_NUMBER,
+                t2.tbraccd_detail_code,
+                t3.tbbdetc_desc
+            FROM tbrappl t1 JOIN tbraccd t2 ON (
+                t1.tbrappl_pidm = t2.tbraccd_pidm
+                AND t1.tbrappl_chg_tran_number = t2.tbraccd_tran_number)
+                JOIN tbbdetc t3 ON (t2.tbraccd_detail_code = t3.tbbdetc_detail_code)
+            WHERE t1.tbrappl_pidm = pidm
+                AND t1.tbrappl_pay_tran_number = tranNUmber
+        ) LOOP
+            vlc_codigo_tranOrig := i.tbraccd_detail_code;
+            vlc_respuesta := i.tbbdetc_desc;
+        END LOOP;
+
+        IF (vlc_codigo_tranOrig != 'ALIM') THEN
+            vlc_respuesta := '|';
+        END IF;
+        
+        RETURN vlc_respuesta;
+    END desplegar_programa;
 END;
 
 DROP TYPE TY_TRALIX_ARR_05;
@@ -1640,9 +1676,36 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         vlb_exento BOOLEAN;
         concepto TY_TRALIX_LINEA_05;
         vln_subTotal TBRACCD.TBRACCD_AMOUNT%TYPE;
+        generarImpuestos BOOLEAN := false;
+        programa VARCHAR2(200 CHAR);
     BEGIN
         totalCargos := 0;
         impTrasladados := 0;
+
+        programa := SELF.receptor.programa;
+        IF (NVL(SELF.receptor.programa, '|') = '|') THEN
+            FOR j IN (
+                SELECT sovlcur_program
+                FROM sovlcur
+                WHERE sovlcur_pidm = pidm
+	                AND sovlcur_lmod_code = sb_curriculum_str.f_learner)
+            LOOP
+                programa := j.sovlcur_program;
+            END LOOP;
+        END IF;
+
+        /* Determinar si es necesario calcular impuestos o no */
+        dbms_output.put_line('Programa: '||SELF.receptor.programa);
+        FOR i IN (
+            SELECT sorxref_banner_value
+            FROM sorxref
+            WHERE sorxref_xlbl_code = 'IMPUESTO'
+                AND sorxref_edi_value = programa
+        ) LOOP
+            dbms_output.put_line('Tipo Impuesto: '||i.sorxref_banner_value);
+            generarImpuestos := (i.sorxref_banner_value = 'IVA');
+        END LOOP;
+
         vlc_detalleImp := 'IVA';
         FOR j IN (
             SELECT tbraccd_amount, tbraccd_receipt_number,
@@ -1651,32 +1714,56 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             WHERE tbraccd_pidm = pidm
                 AND tbraccd_tran_number = tranNumber
         ) LOOP
-            vlb_exento := FALSE;
-            vln_subTotal := j.tbraccd_amount / 1.16;
-            vln_sumaImpuestos := j.tbraccd_amount - vln_subTotal;
-            concepto := TY_TRALIX_LINEA_05(pidm, tranNumber);
-            concepto.importe := vln_subTotal;
-            SELF.conceptos.EXTEND;
-            SELF.conceptos(SELF.conceptos.COUNT) := concepto;
+            IF (generarImpuestos) THEN
+                vlb_exento := FALSE;
+                vln_subTotal := j.tbraccd_amount / 1.16;
+                vln_sumaImpuestos := j.tbraccd_amount - vln_subTotal;
+                concepto := TY_TRALIX_LINEA_05(pidm, tranNumber);
+                concepto.importe := vln_subTotal;
+                SELF.conceptos.EXTEND;
+                SELF.conceptos(SELF.conceptos.COUNT) := concepto;
 
-            totalCargos := totalCargos + vln_subTotal;
+                totalCargos := totalCargos + vln_subTotal;
 
-            impuestoTras := TY_TRALIX_LINEA_06(
-                vlc_detalleImp, 
-                vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
-                vln_sumaImpuestos,
-                j.tbraccd_amount - vln_sumaImpuestos);
+                impuestoTras := TY_TRALIX_LINEA_06(
+                    vlc_detalleImp, 
+                    vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
+                    vln_sumaImpuestos,
+                    j.tbraccd_amount - vln_sumaImpuestos);
 
-            impTrasladados := impTrasladados + vln_sumaImpuestos;
+                impTrasladados := impTrasladados + vln_sumaImpuestos;
 
-            concImpTrasRow := TY_TRALIX_LINEA_05C(
-                concepto.idConcepto,
-                j.tbraccd_amount - vln_sumaImpuestos,
-                vlc_detalleImp,
-                -- vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
-                impuestoTras.tasaCuota,
-                vln_sumaImpuestos,
-                'Tasa');
+                concImpTrasRow := TY_TRALIX_LINEA_05C(
+                    concepto.idConcepto,
+                    j.tbraccd_amount - vln_sumaImpuestos,
+                    vlc_detalleImp,
+                    -- vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
+                    impuestoTras.tasaCuota,
+                    vln_sumaImpuestos,
+                    'Tasa');
+            ELSE
+                vlb_exento := TRUE;
+                concepto := TY_TRALIX_LINEA_05(pidm, tranNumber);
+
+                SELF.conceptos.EXTEND;
+                SELF.conceptos(SELF.conceptos.COUNT) := concepto;
+                totalCargos := totalCargos + j.tbraccd_amount;
+
+                impuestoTras := TY_TRALIX_LINEA_06(
+                    'IVA',
+                    NULL,
+                    NULL,
+                    j.tbraccd_amount
+                );
+
+                concImpTrasRow := TY_TRALIX_LINEA_05C(
+                    concepto.idConcepto,
+                    j.tbraccd_amount,
+                    'IVA',
+                    0,
+                    0,
+                    'Exento');
+            END IF;
 
             SELF.impuestosTras.EXTEND;
             SELF.impuestosTras(SELF.impuestosTras.COUNT) := impuestoTras;    
