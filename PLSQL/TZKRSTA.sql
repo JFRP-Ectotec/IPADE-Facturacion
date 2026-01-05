@@ -1,4 +1,12 @@
 CREATE OR REPLACE PACKAGE TZKRSTA IS
+    FUNCTION fn_insertar_tvrtsta(
+        pidm IN NUMBER,
+        tran_number IN NUMBER,
+        codigo IN VARCHAR2,
+        valor IN VARCHAR2,
+        secuencial IN OUT NUMBER)
+        RETURN VARCHAR2;
+
     FUNCTION fn_registrar(
         pidm IN NUMBER,
         tran_number IN NUMBER,
@@ -54,9 +62,9 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
     FUNCTION fn_insertar_tvrtsta(
         pidm IN NUMBER,
         tran_number IN NUMBER,
-        secuencial IN NUMBER,
         codigo IN VARCHAR2,
-        valor IN VARCHAR2)
+        valor IN VARCHAR2,
+        secuencial IN OUT NUMBER)
         RETURN VARCHAR2 IS
     BEGIN
         -- dbms_output.put_line('Insertar coidgo TSTA:' || codigo);
@@ -69,6 +77,8 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
             '', valor, 
             SYSDATE, USER, 'Tralix'
         );
+
+        secuencial := secuencial + 1;
 
         RETURN 'OP_EXITOSA';
     EXCEPTION
@@ -86,28 +96,30 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         vln_secuencial NUMBER;
         vlc_seqCodigo VARCHAR2(2 CHAR);
     BEGIN
-        SELECT NVL(MAX(tvrtsta_seq_no), 0)
+        SELECT NVL(MAX(tvrtsta_seq_no), 0) + 1
         INTO vln_secuencial
         FROM tvrtsta
         WHERE tvrtsta_pidm = pidm
             AND tvrtsta_tran_number = tran_number;
 
         vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number);  
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
 
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm, tran_number, vln_secuencial,
-            'F'||vlc_seqCodigo, datos_factura.factura
+            pidm, tran_number,
+            'F'||vlc_seqCodigo, datos_factura.factura,
+            vln_secuencial
         );
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             ROLLBACK;
             RETURN vlc_respCall;
         END IF;
 
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm, tran_number, vln_secuencial,
-            'SOC', datos_factura.sociedad
+            pidm, tran_number,
+            'SOC', datos_factura.sociedad,
+            vln_secuencial
         );
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             ROLLBACK;
@@ -130,30 +142,33 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
         vlc_seqCodigo := SUBSTR(vlc_seqCodigo, 2, 1);
 
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm, tran_number, vln_secuencial,
-            'FV'||vlc_seqCodigo, TO_CHAR(datos_factura.fechaVenc, 'DD-MON-YYYY')
+            pidm, tran_number,
+            'FV'||vlc_seqCodigo, TO_CHAR(datos_factura.fechaVenc, 'DD-MON-YYYY'), 
+            vln_secuencial
         );
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             ROLLBACK;
             RETURN vlc_respCall;
         END IF;
 
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm, tran_number, vln_secuencial,
-            'UI'||vlc_seqCodigo, datos_factura.uuid
+            pidm, tran_number,
+            'UI'||vlc_seqCodigo, datos_factura.uuid, 
+            vln_secuencial
         );
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             ROLLBACK;
             RETURN vlc_respCall;
         END IF;
 
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm, tran_number, vln_secuencial,
-            'FP'||vlc_seqCodigo, datos_factura.formaPago
+            pidm, tran_number,
+            'FP'||vlc_seqCodigo, datos_factura.formaPago, 
+            vln_secuencial
         );
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             ROLLBACK;
@@ -164,20 +179,22 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
             vlc_seqCodigo := '5';
         END IF;
 
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm, tran_number, vln_secuencial,
-            'UF'||vlc_seqCodigo, datos_factura.usoCfdi
+            pidm, tran_number,
+            'UF'||vlc_seqCodigo, datos_factura.usoCfdi, 
+            vln_secuencial
         );
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             ROLLBACK;
             RETURN vlc_respCall;
         END IF;
 
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm, tran_number, vln_secuencial,
-            'RF'||vlc_seqCodigo, datos_factura.regFiscal
+            pidm, tran_number,
+            'RF'||vlc_seqCodigo, datos_factura.regFiscal, 
+            vln_secuencial
         );
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             ROLLBACK;
@@ -222,7 +239,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         vlc_seqCodigo VARCHAR2(1 CHAR);
         vlc_respCall VARCHAR2(1000 CHAR);
     BEGIN
-        SELECT NVL(MAX(tvrtsta_seq_no), 0)
+        SELECT NVL(MAX(tvrtsta_seq_no), 0) + 1
         INTO vln_secuencial
         FROM tvrtsta
         WHERE tvrtsta_pidm = pidm
@@ -231,10 +248,11 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
         vlc_seqCodigo := fn_determina_sigNumero_canc(pidm, tran_number);  
 
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm, tran_number, vln_secuencial,
-            'CA'||vlc_seqCodigo, motivo_sust
+            pidm, tran_number,
+            'CA'||vlc_seqCodigo, motivo_sust, 
+            vln_secuencial
         );
         
         IF (vlc_respCall != 'OP_EXITOSA') THEN
@@ -260,17 +278,17 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         --     RETURN vlc_respCall;
         -- END IF;
 
-        SELECT NVL(MAX(tvrtsta_seq_no), 0)
+        SELECT NVL(MAX(tvrtsta_seq_no), 0) + 1
         INTO vln_secuencial
         FROM tvrtsta
         WHERE tvrtsta_pidm = pidm_canc
             AND tvrtsta_tran_number = tran_number_canc
         ;
 
-        vln_secuencial := vln_secuencial + 1;
+        -- vln_secuencial := vln_secuencial + 1;
         vlc_respCall := fn_insertar_tvrtsta(
-            pidm_canc, tran_number_canc, vln_secuencial,
-            'RCL', motivo_sust
+            pidm_canc, tran_number_canc,
+            'RCL', motivo_sust, vln_secuencial
         );
         
         IF (vlc_respCall != 'OP_EXITOSA') THEN
