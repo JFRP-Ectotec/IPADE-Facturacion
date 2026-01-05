@@ -728,7 +728,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 registro_tsta := TY_TRALIX_REGTSTA(
                     vlc_prefijo||'-'||vln_numFactura,
                     'IPADE'||vlc_num_entidad, 
-                    datosFactura.receptor.rfc, 
                     uuidTralix, 
                     datosFactura.info_gral_comprobante.fecha,
                     datosFactura.receptor.usoCFDI,
