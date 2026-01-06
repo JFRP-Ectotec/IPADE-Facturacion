@@ -116,3 +116,8 @@ BEGIN
 
     COMMIT;
 END;
+
+SELECT *
+FROM tvvtsta
+WHERE tvvtsta_code LIKE 'UI%'
+;
