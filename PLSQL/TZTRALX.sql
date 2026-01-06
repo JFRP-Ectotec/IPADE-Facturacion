@@ -59,12 +59,39 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         etiqueta IN VARCHAR2 DEFAULT 'FAC')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
+    FUNCTION fn_factura_cp_tralix(
+        matricula IN VARCHAR2,
+        tran_number IN NUMBER,
+        tipo_pago_banner IN VARCHAR2 DEFAULT '99',
+        etiqueta IN VARCHAR2 DEFAULT 'FAC')
+        RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
+
     separador constant varchar2(1) := '|';
 END TZTRALX;
 /
 show errors;
 
 CREATE OR REPLACE PACKAGE BODY TZTRALX IS
+    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'O'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+	cgc_raiz_debug        CONSTANT VARCHAR2(100) := 'TZTRALX-';
+
+    PROCEDURE pr_registrar_debug (
+        pic_procedimiento	IN	VARCHAR2,
+        pic_texto   		IN  VARCHAR2
+    ) IS
+	BEGIN
+		IF cgc_estatus_debug IN ('A','D') THEN
+			P_BAN_DEBUG(cgc_raiz_debug||pic_procedimiento,pic_texto);
+		END IF;
+		
+		IF cgc_estatus_debug IN ('A','O') THEN
+			DBMS_OUTPUT.PUT_LINE(pic_procedimiento||' -> '||pic_texto);
+		END IF;
+	EXCEPTION
+		WHEN OTHERS THEN
+			NULL;
+	END;
+
     -- Elementos del objeto raiz.
     FUNCTION fn_formateo_guid(guid IN VARCHAR2)
         RETURN VARCHAR2 IS
@@ -240,7 +267,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         END LOOP;
 
         l_url := l_url || l_function;
-        dbms_output.put_line('URL:'||l_url);
+
+        pr_registrar_debug('envio_tralix', 'URL:'||l_url);
+
         UTL_HTTP.set_wallet('file:/'||l_wallet_path , l_wallet_password );
         UTL_HTTP.SET_DETAILED_EXCP_SUPPORT(true);
         BEGIN
@@ -308,7 +337,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             RETURN l_response;
         END IF;
 
-        dbms_output.put_line('Resp RAW:' || l_response);
+        pr_registrar_debug('envio_tralix', 'Resp RAW:' || l_response);
 
         -- Determinar status de la respuesta
         l_indice := INSTR(l_response, l_statusCodeTag);
@@ -483,6 +512,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pubgral BOOLEAN := FALSE;
 
         vlc_tipo_pago_banner VARCHAR2(10 CHAR);
+
+        vlc_tipoFactura_TSTA VARCHAR2(2 CHAR) := 'FC';
     BEGIN
         BEGIN
             vln_pidm := gb_common.f_get_pidm(matricula);
@@ -533,14 +564,16 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         -- dbms_output.put_line('camp_code:'||vlc_camp_code);
         -- dbms_output.put_line('num_tipoDir:'||vlc_num_tipoDir);
-        dbms_output.put_line('num_entidad:'||vlc_num_entidad);
+        
+        pr_registrar_debug('envio_tralix', 'num_entidad:'||vlc_num_entidad);
 
         IF (NVL(vlc_num_entidad, '|') = '|') THEN
             -- pr_log_error(vln_pidm, '', 'La carrera del alumno no está registrada con etiqueta IPADEEM en SOAXREF',
             --     vln_monto, tipo_pago_banner, tran_number);
             vlt_respuesta.estatus := 'ERROR';
-            vlt_respuesta.errores.EXTEND;
-            vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('La carrera del alumno no está registrada con etiqueta IPADEEM en SOAXREF');
+            vlt_respuesta.agregar_error('La carrera del alumno no está registrada con etiqueta IPADEEM en SOAXREF');
+            -- vlt_respuesta.errores.EXTEND;
+            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('La carrera del alumno no está registrada con etiqueta IPADEEM en SOAXREF');
             RETURN vlt_respuesta;
         END IF;
 
@@ -558,7 +591,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             FOR m IN datosFactura.errores.FIRST .. datosFactura.errores.LAST
             LOOP
                 vlt_respuesta.errores.EXTEND;
-                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(datosFactura.errores(m).mensaje);
                 vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := datosFactura.errores(m);
             END LOOP;
             -- vlc_respuesta := vlt_respuesta.imprimir_json();
@@ -617,21 +649,21 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         datosFactura.info_gral_comprobante.set_folio(vlc_prefijo, TO_CHAR(vln_numFactura));
         IF pubgral THEN
             datosFactura.receptor.datos_pubgral;
+            vlc_tipoFactura_TSTA := 'FP';
         END IF;
         datosFactura.ajustar_pubgral;
         vlc_objeto_principal := crea_objeto_principal(matricula, vln_pidm, tran_number, 
             datosFactura, vlc_num_entidad);
         vlt_respuesta.mainData := vlc_objeto_principal;
 
-        dbms_output.put_line('payload:' || vlc_objeto_principal);
+        pr_registrar_debug('fn_factura_base_tralix', 'payload:' || vlc_objeto_principal);
 
         vlc_envioTralix := envio_factura_tralix(vlc_objeto_principal, vlb_estatusEnvio);
-
         vln_monto := 0;
 
         bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
 
-        dbms_output.put_line('bufferMensaje1:' || bufferMensaje);
+        pr_registrar_debug('fn_factura_base_tralix', 'bufferMensaje1:' || bufferMensaje);
 
         IF (NOT(vlb_estatusEnvio)) THEN
             ROLLBACK;
@@ -639,7 +671,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             /* TODO: Si aqui hay un error de  "La clave del campo RegimenFiscalR no corresponde de acuerdo al RFC del receptor" 
             y es primera vez volver a enviar pero indicando que es segunda vez y como si fuera a PubGral. */
 
-            dbms_output.put_line('CON ERROR: ' || bufferMensaje);
+            pr_registrar_debug('fn_factura_base_tralix', 'CON ERROR: ' || bufferMensaje);
 
             IF (NOT(pubgral) AND fn_reenviar(bufferMensaje)) THEN
                 datosFactura.receptor.datos_pubgral;
@@ -648,10 +680,11 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     datosFactura, vlc_num_entidad);
                 vlt_respuesta.mainData := vlc_objeto_principal;
 
-                dbms_output.put_line('payload 2nd:' || vlc_objeto_principal);
+                pr_registrar_debug('fn_factura_base_tralix', 'payload 2nd:' || vlc_objeto_principal);
 
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('Situación con Régimen Fiscal. Se envía a PUBLICO EN GENERAL.');
+                vlt_respuesta.agregar_error('Situación con Régimen Fiscal. Se envía a PUBLICO EN GENERAL.');
+                -- vlt_respuesta.errores.EXTEND;
+                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('Situación con Régimen Fiscal. Se envía a PUBLICO EN GENERAL.');
 
                 vlc_envioTralix := envio_factura_tralix(vlc_objeto_principal, vlb_estatusEnvio);
 
@@ -659,14 +692,15 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
                 bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
 
-                dbms_output.put_line('bufferMensaje 2nd:' || bufferMensaje);
+                pr_registrar_debug('fn_factura_base_tralix', 'bufferMensaje 2nd:' || bufferMensaje);
             END IF;
 
             IF (NOT(vlb_estatusEnvio)) THEN
                 ROLLBACK;
                 vlt_respuesta.estatus := 'ERROR';
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
+                vlt_respuesta.agregar_error(bufferMensaje);
+                -- vlt_respuesta.errores.EXTEND;
+                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
 
                 FOR j IN datosFactura.conceptos.FIRST .. datosFactura.conceptos.LAST
                 LOOP
@@ -705,7 +739,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
             uuidTralix := SUBSTR(bufferMensaje, l_indice + LENGTH(campoUUID) + 1, l_ind_fin - (l_indice + LENGTH(campoUUID) + 2));
 
-            dbms_output.put_line('UUID_Value:'||uuidTralix);
+            pr_registrar_debug('fn_factura_base_tralix', 'UUID_Value:'||uuidTralix);
 
             BEGIN
                 INSERT INTO TAISMGR.TZRPOFI (
@@ -725,24 +759,31 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 );
 
                 -- Insertar en TZRTSTA
-                registro_tsta := TY_TRALIX_REGTSTA(
-                    vlc_prefijo||'-'||vln_numFactura,
-                    'IPADE'||vlc_num_entidad, 
-                    datosFactura.receptor.rfc, 
-                    uuidTralix, 
-                    datosFactura.info_gral_comprobante.fecha,
-                    datosFactura.receptor.usoCFDI,
-                    tipo_pago_facturar);
+                -- registro_tsta := TY_TRALIX_REGTSTA(
+                --     vlc_prefijo||'-'||vln_numFactura,
+                --     'IPADE'||vlc_num_entidad, 
+                --     uuidTralix, 
+                --     datosFactura.info_gral_comprobante.fecha,
+                --     datosFactura.receptor.usoCFDI,
+                --     tipo_pago_facturar);
 
                 -- dbms_output.put_line('Registrar en TSTA');
 
-                vlc_llamada := tzkrsta.fn_registrar(vln_pidm, tran_number, registro_tsta);
+                -- vlc_llamada := tzkrsta.fn_registrar(vln_pidm, tran_number, registro_tsta);
+                pr_registrar_debug('fn_factura_base_tralix', 'proceso_factura:'||proceso_factura||' - vlcTipoFacturaTSTA:'||vlc_tipoFactura_TSTA);
+                
+                IF (proceso_factura = 'ANT' AND vlc_tipoFactura_TSTA != 'FC') THEN
+                    vlc_tipoFactura_TSTA := 'FA';
+                END IF;
+
+                vlc_llamada := tzkrsta.fn_registrar(vln_pidm, tran_number, uuidTralix, datosFactura, vlc_tipoFactura_TSTA);
 
                 IF (vlc_llamada != 'OP_EXITOSA') THEN
                     rollback;
                     vlt_respuesta.estatus := 'ERROR';
-                    vlt_respuesta.errores.EXTEND;
-                    vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(vlc_llamada);
+                    vlt_respuesta.agregar_error(vlc_llamada);
+                    -- vlt_respuesta.errores.EXTEND;
+                    -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(vlc_llamada);
                     RETURN vlt_respuesta;
                 END IF;
                 COMMIT;
@@ -751,8 +792,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 WHEN OTHERS THEN
                     rollback;
                     vlt_respuesta.estatus := 'ERROR';
-                    vlt_respuesta.errores.EXTEND;
-                    vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(sqlerrm);
+                    vlt_respuesta.agregar_error(sqlerrm);
+                    -- vlt_respuesta.errores.EXTEND;
+                    -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(sqlerrm);
                     RETURN vlt_respuesta;
             END;
 
@@ -874,8 +916,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         EXCEPTION
             WHEN OTHERS THEN
                 vlt_respuesta.estatus := 'ERROR';
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la matrícula');
+                vlt_respuesta.agregar_error('No existe la matrícula');
+                -- vlt_respuesta.errores.EXTEND;
+                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la matrícula');
                 RETURN vlt_respuesta;
         END;
 
@@ -908,8 +951,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         IF (NVL(vlc_guid_cancelar, '|') = '|') THEN
             vlt_respuesta.estatus := 'ERROR';
-            vlt_respuesta.errores.EXTEND;
-            vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la factura a cancelar');
+            vlt_respuesta.agregar_error('No existe la factura a cancelar');
+            -- vlt_respuesta.errores.EXTEND;
+            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la factura a cancelar');
             RETURN vlt_respuesta;
         END IF;
 
@@ -932,16 +976,18 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             IF (vlc_llamada != 'OP_EXITOSA') THEN
                 rollback;
                 vlt_respuesta.estatus := 'ERROR';
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(vlc_llamada);
+                vlt_respuesta.agregar_error(vlc_llamada);
+                -- vlt_respuesta.errores.EXTEND;
+                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(vlc_llamada);
                 RETURN vlt_respuesta;
             END IF;
             COMMIT;
         ELSE
             /* Guardar en TZRPAYS, con status = 'T' */
             vlt_respuesta.estatus := 'ERROR';
-            vlt_respuesta.errores.EXTEND;
-            vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
+            vlt_respuesta.agregar_error(bufferMensaje);
+            -- vlt_respuesta.errores.EXTEND;
+            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
             BEGIN
                 pr_log_error(vln_pidm, vlc_numFactura, bufferMensaje,
                     0, motivo_canc, tran_number);
@@ -949,8 +995,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 WHEN OTHERS THEN
                     rollback;
                     vlt_respuesta.estatus := 'ERROR';
-                    vlt_respuesta.errores.EXTEND;
-                    vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(sqlerrm);
+                    vlt_respuesta.agregar_error(sqlerrm);
+                    -- vlt_respuesta.errores.EXTEND;
+                    -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(sqlerrm);
                     RETURN vlt_respuesta;
             END;
         END IF;
@@ -994,8 +1041,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         EXCEPTION
             WHEN OTHERS THEN
                 vlt_respuesta.estatus := 'ERROR';
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la matrícula de la factura cancelada.');
+                vlt_respuesta.agregar_error('No existe la matrícula de la factura cancelada.');
+                -- vlt_respuesta.errores.EXTEND;
+                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la matrícula de la factura cancelada.');
                 RETURN vlt_respuesta;
         END;
 
@@ -1004,8 +1052,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         EXCEPTION
             WHEN OTHERS THEN
                 vlt_respuesta.estatus := 'ERROR';
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la matrícula de la factura que sustituirá.');
+                vlt_respuesta.agregar_error('No existe la matrícula de la factura que sustituirá.');
+                -- vlt_respuesta.errores.EXTEND;
+                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la matrícula de la factura que sustituirá.');
                 RETURN vlt_respuesta;
         END;
 
@@ -1022,8 +1071,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         IF (NVL(vlc_guid_cancelar, '|') = '|') THEN
             vlt_respuesta.estatus := 'ERROR';
-            vlt_respuesta.errores.EXTEND;
-            vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la factura a cancelar');
+            vlt_respuesta.agregar_error('No existe la factura a cancelar');
+            -- vlt_respuesta.errores.EXTEND;
+            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la factura a cancelar');
             RETURN vlt_respuesta;
         END IF;
 
@@ -1042,8 +1092,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         IF (NVL(vlc_guid_sustituir, '|') = '|') THEN
             vlt_respuesta.estatus := 'ERROR';
-            vlt_respuesta.errores.EXTEND;
-            vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la factura que sustituirá');
+            vlt_respuesta.agregar_error('No existe la factura que sustituirá');
+            -- vlt_respuesta.errores.EXTEND;
+            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la factura que sustituirá');
             RETURN vlt_respuesta;
         END IF;
 
@@ -1068,7 +1119,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlc_envioTralix := envio_canc_tralix(vlc_objeto_principal, 'SUST', vlb_estatusEnvio);
         bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
 
-        dbms_output.put_line('buffer:'||bufferMensaje);
+        pr_registrar_debug('fn_sustitucion_tralix', 'buffer:'||bufferMensaje);
+                
 
         IF (vlb_estatusEnvio) THEN
             -- vlc_full_motivo_canc := motivo_canc;
@@ -1085,15 +1137,17 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             IF (vlc_llamada != 'OP_EXITOSA') THEN
                 rollback;
                 vlt_respuesta.estatus := 'ERROR';
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(vlc_llamada);
+                vlt_respuesta.agregar_error(vlc_llamada);
+                -- vlt_respuesta.errores.EXTEND;
+                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(vlc_llamada);
                 RETURN vlt_respuesta;
             END IF;
             COMMIT;
         ELSE
             vlt_respuesta.estatus := 'ERROR';
-            vlt_respuesta.errores.EXTEND;
-            vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
+            vlt_respuesta.agregar_error(bufferMensaje);
+            -- vlt_respuesta.errores.EXTEND;
+            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
 
             /* Guardar en TZRPAYS, con status = 'T' */
             BEGIN
@@ -1103,8 +1157,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 WHEN OTHERS THEN
                     rollback;
                     vlt_respuesta.estatus := 'ERROR';
-                    vlt_respuesta.errores.EXTEND;
-                    vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(sqlerrm);
+                    vlt_respuesta.agregar_error(sqlerrm);
+                    -- vlt_respuesta.errores.EXTEND;
+                    -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(sqlerrm);
                     RETURN vlt_respuesta;
             END;
         END IF;
@@ -1123,6 +1178,23 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
             tipo_pago_facturar, etiqueta, 'ANT');
     END fn_factura_ant_tralix;
+
+    FUNCTION fn_factura_cp_tralix(
+        matricula IN VARCHAR2,
+        tran_number IN NUMBER,
+        tipo_pago_banner IN VARCHAR2 DEFAULT '99',
+        etiqueta IN VARCHAR2 DEFAULT 'FAC')
+        RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
+        vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
+    BEGIN
+        vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
+        vlt_respuesta.estatus := 'ERROR';
+        vlt_respuesta.agregar_error('No implementado aún.');
+        -- vlt_respuesta.errores.EXTEND;
+        -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No implementado aún.');
+
+        RETURN vlt_respuesta;
+    END fn_factura_cp_tralix;
 END TZTRALX;
 /
 show errors;

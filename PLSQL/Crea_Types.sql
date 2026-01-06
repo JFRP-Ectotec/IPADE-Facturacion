@@ -30,11 +30,14 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA AS OBJECT
     tipo_registro VARCHAR2(30 CHAR),
     sep VARCHAR2(1 CHAR),
     errores TY_TRALIX_ARR_ERROR,
+    estatus_debug  VARCHAR2(1 CHAR), --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+	raiz_debug     VARCHAR2(100 CHAR),
     MEMBER PROCEDURE INIT(tipo_registro VARCHAR2),
     MEMBER FUNCTION FORMAT_FECHA(pid_fecha DATE) RETURN VARCHAR2,
     MEMBER FUNCTION FORMAT_MONEDA(pin_cantidad NUMBER) RETURN VARCHAR2,
     MEMBER PROCEDURE INIT_ERRORES,
-    MEMBER PROCEDURE AGREGAR_ERROR(pic_mensaje VARCHAR2)
+    MEMBER PROCEDURE AGREGAR_ERROR(pic_mensaje VARCHAR2),
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2)
 ) NOT FINAL INSTANTIABLE;
 
 CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA AS
@@ -43,6 +46,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA AS
         SELF.tipo_registro := tipo_registro;
         SELF.sep := '|';
         SELF.errores := TY_TRALIX_ARR_ERROR();
+        SELF.estatus_debug := 'I';
     END INIT;
 
     MEMBER FUNCTION FORMAT_FECHA(pid_fecha DATE) 
@@ -80,11 +84,25 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA AS
         SELF.errores.EXTEND;
         SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR(pic_mensaje);
     END AGREGAR_ERROR;
+
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2) IS
+    BEGIN
+        IF estatus_debug IN ('A','D') THEN
+			P_BAN_DEBUG(raiz_debug||pic_procedimiento,pic_texto);
+		END IF;
+		
+		IF estatus_debug IN ('A','O') THEN
+			DBMS_OUTPUT.PUT_LINE(pic_procedimiento||' -> '||pic_texto);
+		END IF;
+	EXCEPTION
+		WHEN OTHERS THEN
+			NULL;
+    END REGISTRAR_DEBUG;
 END;
 
 -----------
 
-DROP TYPE TY_TRALIX_LINEA_00;
+-- DROP TYPE TY_TRALIX_LINEA_00;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_00 UNDER TY_TRALIX_LINEA
 (
@@ -138,7 +156,7 @@ END;
 
 ---------------
 
-DROP TYPE TY_TRALIX_LINEA_01;
+-- DROP TYPE TY_TRALIX_LINEA_01;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_01 UNDER TY_TRALIX_LINEA
 (
@@ -199,15 +217,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
 
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
-        -- SELF.fecha := SYSDATE - 1;   -- TEMPORAL: Tomar TBRACCD_EFFECTIVE_DATE de la transacción.
         SELF.moneda := 'MXN';      -- Consultar catalogo c_Moneda
         SELF.metodoPago := metodoPago;  -- Consultar catalogo c_MetodoPago
         SELF.exportacion := '01';  -- Consultar catalogo c_Exportacion
         SELF.tipoComprobante := 'I';
         self.formaPago := formaPago;
-
-        -- dbms_output.put_line('numEntidad:'||numEntidad);
-        dbms_output.put_line('numEntidad:'||difEmpresa);
 
         FOR q IN (
             SELECT sr.spraddr_zip
@@ -228,7 +242,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
         ) LOOP
             SELF.totalNum := i.tbraccd_amount;
             SELF.totalLetra := GZKNUMB.monto_escrito(SELF.totalNum);
-            SELF.fecha := i.tbraccd_effective_date - 6/24;
+            -- SELF.fecha := i.tbraccd_effective_date - 6/24;
+            SELF.fecha := SYSDATE - 1;   -- TEMPORAL: Tomar TBRACCD_EFFECTIVE_DATE de la transacción.
         END LOOP;
 
         FOR j IN (
@@ -321,7 +336,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
 END;
 
 -----------------
-DROP TYPE TY_TRALIX_LINEA_02;
+-- DROP TYPE TY_TRALIX_LINEA_02;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_02 UNDER TY_TRALIX_LINEA
 (
@@ -369,7 +384,7 @@ END;
 
 ------------------
 
-DROP TYPE TY_TRALIX_LINEA_02A;
+-- DROP TYPE TY_TRALIX_LINEA_02A;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_02A UNDER TY_TRALIX_LINEA
 (
@@ -416,7 +431,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
 END;
 
 ----------------
-DROP TYPE TY_TRALIX_LINEA_03;
+-- DROP TYPE TY_TRALIX_LINEA_03;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_03 UNDER TY_TRALIX_LINEA
 (
@@ -574,8 +589,6 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
             SELF.datos_pubgral;
             RETURN;
         END IF;
-
-        -- dbms_output.put_line('Checando direcciones:'|| pidm ||' - '||num_entidad);
 
         FOR i IN (
             SELECT sp.*, st.stvstat_desc, sy.stvcnty_desc, sn.stvnatn_nation
@@ -747,7 +760,7 @@ END;
 
 ----------------
 
-DROP TYPE TY_TRALIX_LINEA_05;
+-- DROP TYPE TY_TRALIX_LINEA_05;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_05 UNDER TY_TRALIX_LINEA
 (
@@ -929,13 +942,13 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
     END desplegar_programa;
 END;
 
-DROP TYPE TY_TRALIX_ARR_05;
+-- DROP TYPE TY_TRALIX_ARR_05;
 
 CREATE OR REPLACE TYPE TY_TRALIX_ARR_05 AS TABLE OF TY_TRALIX_LINEA_05;
 
 -------------
 
-DROP TYPE TY_TRALIX_LINEA_05C;
+-- DROP TYPE TY_TRALIX_LINEA_05C;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_05C UNDER TY_TRALIX_LINEA
 (
@@ -1027,13 +1040,13 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05C AS
     END validar;
 END;
 
-DROP TYPE TY_TRALIX_ARR_05C;
+-- DROP TYPE TY_TRALIX_ARR_05C;
 
 CREATE OR REPLACE TYPE TY_TRALIX_ARR_05C AS TABLE OF TY_TRALIX_LINEA_05C;
 
 -------------
 
-DROP TYPE TY_TRALIX_LINEA_06;
+-- DROP TYPE TY_TRALIX_LINEA_06;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_06 UNDER TY_TRALIX_LINEA
 (
@@ -1067,7 +1080,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_06 AS
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
 
-        dbms_output.put_line('clave_impuesto:'||clave_impuesto);
+        -- dbms_output.put_line('clave_impuesto:'||clave_impuesto);
 
         IF clave_impuesto LIKE '%IVA' THEN
             SELF.clave_impuesto := '002';
@@ -1121,14 +1134,14 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_06 AS
     END validar;
 END;
 
-DROP TYPE TY_TRALIX_ARR_06;
+-- DROP TYPE TY_TRALIX_ARR_06;
 
 CREATE OR REPLACE TYPE TY_TRALIX_ARR_06 AS TABLE OF TY_TRALIX_LINEA_06;
 
 
 -------------
 
-DROP TYPE TY_TRALIX_LINEA_07;
+-- DROP TYPE TY_TRALIX_LINEA_07;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_07 UNDER TY_TRALIX_LINEA
 (
@@ -1182,13 +1195,13 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_07 AS
     END validar;
 END;
 
-DROP TYPE TY_TRALIX_ARR_07;
+-- DROP TYPE TY_TRALIX_ARR_07;
 
 CREATE OR REPLACE TYPE TY_TRALIX_ARR_07 AS TABLE OF TY_TRALIX_LINEA_07;
 
 -------------
 
-DROP TYPE TY_TRALIX_LINEA_09;
+-- DROP TYPE TY_TRALIX_LINEA_09;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_09 UNDER TY_TRALIX_LINEA
 (
@@ -1269,7 +1282,7 @@ END;
 
 -------------
 
-DROP TYPE TY_TRALIX_LINEA_99;
+-- DROP TYPE TY_TRALIX_LINEA_99;
 
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_99 UNDER TY_TRALIX_LINEA
 (
@@ -1305,7 +1318,7 @@ END;
 
 --------------
 
-DROP TYPE TY_TRALIX_FACTURA;
+-- DROP TYPE TY_TRALIX_FACTURA;
 
 CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
 (
@@ -1702,7 +1715,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             WHERE sorxref_xlbl_code = 'IMPUESTO'
                 AND sorxref_edi_value = programa
         ) LOOP
-            dbms_output.put_line('Tipo Impuesto: '||i.sorxref_banner_value);
+            -- dbms_output.put_line('Tipo Impuesto: '||i.sorxref_banner_value);
             generarImpuestos := (i.sorxref_banner_value = 'IVA');
         END LOOP;
 
@@ -1776,7 +1789,7 @@ END;
 
 -------------
 
-DROP TYPE TY_TRALIX_ENVIOFAC_RESPONSE;
+-- DROP TYPE TY_TRALIX_ENVIOFAC_RESPONSE;
 
 CREATE OR REPLACE TYPE TY_TRALIX_ENVIOFAC_RESPONSE AS OBJECT
 (
@@ -1791,7 +1804,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_ENVIOFAC_RESPONSE AS OBJECT
         tranNumber NUMBER
     ) RETURN SELF AS RESULT,
     MEMBER PROCEDURE validar_datos,
-    MEMBER FUNCTION imprimir_json RETURN CLOB
+    MEMBER FUNCTION imprimir_json RETURN CLOB,
+    MEMBER PROCEDURE AGREGAR_ERROR(pic_mensaje VARCHAR2)
 ) NOT FINAL INSTANTIABLE
 ;
 
@@ -1872,4 +1886,10 @@ create or replace TYPE BODY TY_TRALIX_ENVIOFAC_RESPONSE AS
         vlc_respuesta := REPLACE(vlc_respuesta, '"X1": ', ''); 
         RETURN vlc_respuesta;
     END imprimir_json;
+
+    MEMBER PROCEDURE AGREGAR_ERROR(pic_mensaje VARCHAR2) IS
+    BEGIN
+        SELF.errores.EXTEND;
+        SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR(pic_mensaje);
+    END AGREGAR_ERROR;
 END;

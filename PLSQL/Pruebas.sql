@@ -159,6 +159,14 @@ A000
 
 SELECT *
 FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084933')
+;
+
+SELECT tvrtsta_seq_no, tvrtsta_dloc_code, tvrtsta_tsta_code, 
+	tvrtsta_comments, tvrtsta_activity_date
+FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084933')
+	AND tvrtsta_tran_number = 37
 ;
 
 SELECT SUBSTR('PUBGRAL1', 8, 1)
@@ -181,7 +189,7 @@ ORDER BY t.tzrpofi_doc_number DESC
 DECLARE
 	datos_banner CLOB;
 	matricula VARCHAR2(20 CHAR) := 'A00084933';
-	tran_number NUMBER := 81;
+	tran_number NUMBER := 37;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -198,6 +206,11 @@ BEGIN
 		END LOOP;
 	END IF;
 END;
+
+SELECT *
+FROM gurdbug
+ORDER BY gurdbug_date desc
+;
 
 SELECT gb_common.f_get_pidm('A00084739')
 FROM dual;
