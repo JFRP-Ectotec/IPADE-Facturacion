@@ -40,10 +40,24 @@ FROM sorxref
 WHERE sorxref_banner_value = 'CAAD2'
 ;
 
+SELECT tvrtsta_seq_no, tvrtsta_tsta_code, 
+	tvrtsta_dloc_code, tvrtsta_comments
+FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084985')
+    AND tvrtsta_tran_number = 9
+;
+
+DELETE FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084985')
+    AND tvrtsta_tran_number = 9
+;
+
+COMMIT;
+
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084970';
-	tran_number NUMBER := 3;
+	matricula VARCHAR2(20 CHAR) := 'A00084985';
+	tran_number NUMBER := 9;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -63,8 +77,8 @@ END;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084755';
-	tran_number NUMBER := 73;
+	matricula VARCHAR2(20 CHAR) := 'A00084985';
+	tran_number NUMBER := 3;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -148,11 +162,17 @@ Where tbraccd_pidm = gb_common.f_get_pidm('A00084933')
 	AND tbraccd_receipt_number = 811
 ;
 
-SELECT tzrpofi_docnum_pos, tzrpofi_doc_number, tzrpofi_iac_cde, 
-	tzrpofi_activity_date - 6/24
+SELECT * /* tzrpofi_docnum_pos, tzrpofi_doc_number, tzrpofi_iac_cde, 
+	tzrpofi_activity_date - 6/24 */
 FROM tzrpofi
 WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00084969')
 ;
+
+SELECT *
+FROM Tzrpofi
+WHERE tzrpofi_sdoc_code = 'ZPB' AND tzrpofi_doc_number = 5118
+;
+
 
 SELECT tvrpays_pidm, tvrpays_return_code, tvrpays_return_code_desc, 
 	tvrpays_activity_date - 6/24
@@ -245,3 +265,11 @@ SELECT sorxref_banner_value
 FROM sorxref
 WHERE sorxref_xlbl_code = 'IMPUESTO'
 ;
+
+DELETE
+FROM tvrtsta 
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084985')
+	AND tvrtsta_tran_number = 9
+;
+
+COMMIT;

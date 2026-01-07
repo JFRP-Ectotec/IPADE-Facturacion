@@ -772,7 +772,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 -- vlc_llamada := tzkrsta.fn_registrar(vln_pidm, tran_number, registro_tsta);
                 pr_registrar_debug('fn_factura_base_tralix', 'proceso_factura:'||proceso_factura||' - vlcTipoFacturaTSTA:'||vlc_tipoFactura_TSTA);
                 
-                IF (proceso_factura = 'ANT' AND vlc_tipoFactura_TSTA != 'FC') THEN
+                IF (proceso_factura = 'ANT' /* AND vlc_tipoFactura_TSTA != 'FC'*/ ) THEN
                     vlc_tipoFactura_TSTA := 'FA';
                 END IF;
 
@@ -812,6 +812,11 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         etiqueta IN VARCHAR2 DEFAULT 'FAC')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
     BEGIN
+        pr_registrar_debug('fn_factura_tralix', 'matricula:'||matricula);
+        pr_registrar_debug('fn_factura_tralix', 'tran_number:'||tran_number);
+        pr_registrar_debug('fn_factura_tralix', 'tipo_pago_banner:'||tipo_pago_banner);
+        pr_registrar_debug('fn_factura_tralix', 'tipo_pago_facturar:'||tipo_pago_facturar);
+
         RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
             tipo_pago_facturar, etiqueta, 'DEF');
     END fn_factura_tralix;
@@ -1175,6 +1180,11 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         etiqueta IN VARCHAR2 DEFAULT 'FAC')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
     BEGIN
+        pr_registrar_debug('fn_factura_ant_tralix', 'matricula:'||matricula);
+        pr_registrar_debug('fn_factura_ant_tralix', 'tran_number:'||tran_number);
+        pr_registrar_debug('fn_factura_ant_tralix', 'tipo_pago_banner:'||tipo_pago_banner);
+        pr_registrar_debug('fn_factura_ant_tralix', 'tipo_pago_facturar:'||tipo_pago_facturar);
+
         RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
             tipo_pago_facturar, etiqueta, 'ANT');
     END fn_factura_ant_tralix;

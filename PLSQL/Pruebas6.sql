@@ -121,3 +121,8 @@ SELECT *
 FROM tvvtsta
 WHERE tvvtsta_code LIKE 'UI%'
 ;
+
+SELECT * 
+FROM tzrpofi
+WHERE tzrpofi_iac_cde = '8596270E-C3F3-4CE7-81F7-CCB4A4ED7C86'
+;

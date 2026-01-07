@@ -23,7 +23,7 @@ END TZKRSTA;
 show errors;
 
 CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
-    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'O'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'A'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
 	cgc_raiz_debug        CONSTANT VARCHAR2(100) := 'TZKRSTA-';
 
     PROCEDURE pr_registrar_debug (
@@ -115,7 +115,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
                 AND tvrtsta_tsta_code = registros(i).codigo
             ;
 
-            pr_registrar_debug('fn_insertar_tvrtsta','codigo:'||registros(i).codigo||' - Contador:'||vln_contador);
+            pr_registrar_debug('fn_insertar_tvrtsta','UPDATE codigo:'||registros(i).codigo||' - Contador:'||vln_contador);
 
             IF (vln_contador > 0) THEN
                 UPDATE tvrtsta
@@ -362,13 +362,13 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
         -- pr_registrar_tvsta('UI'||vlc_seqCodigo, '', datos_factura.uuid, registros);
         vlc_valor := uuidTralix;
-        IF (tipo_factura = 'FC') THEN
-            vlc_codigo := 'UI'||vlc_seqCodigo;
-            pr_registrar_tvsta('UI'||vlc_seqCodigo, '', uuidTralix, registros);
-        ELSE
+        -- IF (tipo_factura = 'FC') THEN
+        --     vlc_codigo := 'UI'||vlc_seqCodigo;
+        --     pr_registrar_tvsta('UI'||vlc_seqCodigo, '', uuidTralix, registros);
+        -- ELSE
             vlc_codigo := 'UID';
-            pr_registrar_tvsta('UID', '', uuidTralix, registros);    
-        END IF;
+            -- pr_registrar_tvsta('UID', '', uuidTralix, registros);    
+        -- END IF;
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
         
