@@ -821,13 +821,15 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
             SELF.descripcion := 'Capacitación '||k.smrprle_program_desc;
         END LOOP;
 
-       
-
         IF NVL(SELF.descripcion, '|') = '|' THEN
             SELF.descripcion := 'Capacitación';
         ELSE
              /* Localizar que transacción pagó, y si es determinado tipo le cambia SELF.descripcion */  
             descTemporal := desplegar_programa(pidm, tranNumber);
+
+            -- SELF.estatus_debug := 'A';
+            -- SELF.estatus_debug := 'I';
+            
             IF descTemporal != '|' THEN
                 SELF.descripcion := descTemporal;
             END IF;
@@ -918,23 +920,39 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
     MEMBER FUNCTION desplegar_programa(pidm NUMBER, tranNUmber NUMBER) RETURN VARCHAR2 IS
         vlc_respuesta tbbdetc.tbbdetc_desc%TYPE := '|';
         vlc_codigo_tranOrig tbraccd.tbraccd_detail_code%TYPE;
+        vln_contador NUMBER;
     BEGIN
         FOR i IN (
-            SELECT t1.TBRAPPL_CHG_TRAN_NUMBER,
-                t2.tbraccd_detail_code,
+            -- SELECT t1.TBRAPPL_CHG_TRAN_NUMBER,
+            --     t2.tbraccd_detail_code,
+            --     t3.tbbdetc_desc
+            -- FROM tbrappl t1 JOIN tbraccd t2 ON (
+            --     t1.tbrappl_pidm = t2.tbraccd_pidm
+            --     AND t1.tbrappl_chg_tran_number = t2.tbraccd_tran_number)
+            --     JOIN tbbdetc t3 ON (t2.tbraccd_detail_code = t3.tbbdetc_detail_code)
+            -- WHERE t1.tbrappl_pidm = pidm
+            --     AND t1.tbrappl_pay_tran_number = tranNumber
+
+            SELECT t2.tbraccd_detail_code,
                 t3.tbbdetc_desc
-            FROM tbrappl t1 JOIN tbraccd t2 ON (
-                t1.tbrappl_pidm = t2.tbraccd_pidm
-                AND t1.tbrappl_chg_tran_number = t2.tbraccd_tran_number)
+            FROM tbraccd t2
                 JOIN tbbdetc t3 ON (t2.tbraccd_detail_code = t3.tbbdetc_detail_code)
-            WHERE t1.tbrappl_pidm = pidm
-                AND t1.tbrappl_pay_tran_number = tranNUmber
+            WHERE t2.tbraccd_pidm = pidm
+                AND t2.tbraccd_tran_number = tranNumber
         ) LOOP
             vlc_codigo_tranOrig := i.tbraccd_detail_code;
             vlc_respuesta := i.tbbdetc_desc;
         END LOOP;
 
-        IF (vlc_codigo_tranOrig != 'ALIM') THEN
+        SELECT COUNT(*)
+        INTO vln_contador
+        FROM gtvsdax
+        WHERE GTVSDAX_EXTERNAL_CODE = 'TRALIX_FACT'
+            AND GTVSDAX_INTERNAL_CODE = 'DESP_PROG'
+            AND ','||GTVSDAX_COMMENTS||',' LIKE '%,'||vlc_codigo_tranOrig||',%'
+        ;
+
+        IF (vln_contador < 1) THEN
             vlc_respuesta := '|';
         END IF;
         

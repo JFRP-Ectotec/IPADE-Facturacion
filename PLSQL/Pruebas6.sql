@@ -126,3 +126,26 @@ SELECT *
 FROM tzrpofi
 WHERE tzrpofi_iac_cde = '8596270E-C3F3-4CE7-81F7-CCB4A4ED7C86'
 ;
+
+
+SELECT LISTAGG(tbbdetc_detail_code, ',')
+FROM tbbdetc
+WHERE tbbdetc_dcat_code IN ('VIA','SR1', 'SR2')
+;
+
+SELECT *
+FROM tbbdetc
+WHERE tbbdetc_detail_code = 'EXAM'
+;
+
+SELECT s.spriden_id, t.*
+FROM spriden s JOIN tbraccd t 
+    ON (s.spriden_pidm = t.tbraccd_pidm)
+WHERE t.tbraccd_detail_code IN
+(
+    SELECT tbbdetc_detail_code
+    FROM tbbdetc
+    WHERE tbbdetc_dcat_code IN ('VIA','SR1', 'SR2')
+)
+ORDER BY t.tbraccd_activity_date DESC
+;
