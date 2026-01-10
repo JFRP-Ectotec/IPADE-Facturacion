@@ -26,7 +26,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_COMPPAGOS UNDER TY_TRALIX_LINEA
         idPagos VARCHAR2,
         formaPago VARCHAR2
     ) RETURN SELF AS RESULT,
-    MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
+    MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2) /*,
     MEMBER PROCEDURE validar */
 );
 
@@ -42,6 +43,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
     BEGIN
         SELECT self INTO parent FROM dual;
         parent.INIT('compPagos');
+
+        SELF.estatus_debug := 'I';
+        SELF.raiz_debug := 'TY_TRALIX_LINEA_COMPPAGOS';
 
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
@@ -287,13 +291,17 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
         -- END IF;
 
         FOR k IN (
-            SELECT TZRPOFI_IAC_CDE, TZRPOFI_SDOC_CODE
+            SELECT TZRPOFI_IAC_CDE, TZRPOFI_SDOC_CODE,
+                TZRPOFI_DOC_NUMBER
             FROM tzrpofi
             WHERE tzrpofi_pidm = pidm
                 AND TZRPOFI_DOCNUM_POS = tranOriginal
+            ORDER BY tzrpofi_activity_date DESC
         ) LOOP
             SELF.uuidPagoOriginal := k.tzrpofi_iac_cde;
             SELF.serie := k.tzrpofi_sdoc_code;
+            SELF.folio := k.tzrpofi_doc_number;
+            EXIT;
         END LOOP;
 
         SELF.monedaDR := 'MXN';  /* TEMPORAL */
@@ -418,6 +426,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_COMPPAGO AS OBJECT
     envio_automatico TY_TRALIX_LINEA_09,
     finCfdi TY_TRALIX_LINEA_99,
     errores TY_TRALIX_ARR_ERROR,
+    estatus_debug  VARCHAR2(1 CHAR), --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+	raiz_debug     VARCHAR2(100 CHAR),
     CONSTRUCTOR FUNCTION TY_TRALIX_COMPPAGO(
         matricula VARCHAR2,
         tranNumber NUMBER,
@@ -427,8 +437,10 @@ CREATE OR REPLACE TYPE TY_TRALIX_COMPPAGO AS OBJECT
         formaPago VARCHAR2,
         metodoPago VARCHAR2
     ) RETURN SELF AS RESULT,
-    MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
-    MEMBER PROCEDURE validar */
+    MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
+    MEMBER PROCEDURE ajustar_pubgral,
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2),
+    MEMBER PROCEDURE validar
 );
 
 CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
@@ -452,8 +464,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         numLineas := numLineas + 1;
 
         SELF.envio_automatico := ty_tralix_linea_09(matricula);
+
         IF (NVL(SELF.envio_automatico.eMail, '*') != '*') THEN
             numLineas := numLineas + 1;
+            SELF.registrar_debug('TY_TRALIX_COMPPAGO', 'numLineas:'||numLineas);
         END IF;
         
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, 
@@ -548,7 +562,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             SELF.compTotales.imprimir_linea || '|' ||
             SELF.doctoRel.imprimir_linea
         ;
-
+        
         IF (SELF.impuestos_DR.COUNT > 0) THEN
             FOR j IN SELF.impuestos_DR.FIRST .. SELF.impuestos_DR.LAST
             LOOP
@@ -575,11 +589,110 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         RETURN vlc_respuesta;
     END imprimir_linea;
 
-    -- MEMBER PROCEDURE validar IS
-    -- BEGIN
-    --     SELF.INIT_ERRORES;
-    --     IF (NVL(SELF.id_archivo, '|') = '|') THEN
-    --         SELF.AGREGAR_ERROR('Se debe especificar un identificador de archivo');
-    --     END IF;
-    -- END validar;
+    MEMBER PROCEDURE ajustar_pubgral IS
+    BEGIN
+        IF ((SELF.receptor.esPubGral = 'TRUE') AND (SELF.conceptos.COUNT > 0)) THEN
+            FOR i IN SELF.conceptos.FIRST .. SELF.conceptos.LAST
+            LOOP
+                SELF.conceptos(i).clave_Servicio := '01010101';
+                SELF.conceptos(i).claveUnidad := 'ACT';
+                SELF.conceptos(i).descripcion := 'PÚBLICO EN GENERAL';
+            END LOOP;
+        END IF;
+    END ajustar_pubgral;
+
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2) IS
+    BEGIN
+        IF estatus_debug IN ('A','D') THEN
+			P_BAN_DEBUG(raiz_debug||pic_procedimiento,pic_texto);
+		END IF;
+		
+		IF estatus_debug IN ('A','O') THEN
+			DBMS_OUTPUT.PUT_LINE(pic_procedimiento||' -> '||pic_texto);
+		END IF;
+	EXCEPTION
+		WHEN OTHERS THEN
+			NULL;
+    END REGISTRAR_DEBUG;
+
+    MEMBER PROCEDURE validar IS
+    BEGIN
+        SELF.errores := TY_TRALIX_ARR_ERROR();
+        SELF.inicio_archivo.validar;
+        IF (SELF.inicio_archivo.errores.COUNT > 0) THEN
+            FOR i IN SELF.inicio_archivo.errores.FIRST .. SELF.inicio_archivo.errores.LAST 
+            LOOP
+                SELF.errores.EXTEND;
+                SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR(SELF.inicio_archivo.errores(i).mensaje);
+            END LOOP;
+        END IF;
+
+        SELF.info_gral_comprobante.validar;
+        IF (SELF.info_gral_comprobante.errores.COUNT > 0) THEN
+            FOR j IN SELF.info_gral_comprobante.errores.FIRST .. SELF.info_gral_comprobante.errores.LAST 
+            LOOP
+                SELF.errores.EXTEND;
+                SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR(SELF.info_gral_comprobante.errores(j).mensaje);
+            END LOOP;
+        END IF;
+
+        SELF.receptor.validar;
+        IF (SELF.receptor.errores.COUNT > 0) THEN
+            FOR k IN SELF.receptor.errores.FIRST .. SELF.receptor.errores.LAST 
+            LOOP
+                SELF.errores.EXTEND;
+                SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR(SELF.receptor.errores(k).mensaje);
+            END LOOP;
+        END IF;
+
+        IF (SELF.conceptos.COUNT > 0) THEN
+            FOR m IN SELF.conceptos.FIRST .. SELF.conceptos.LAST
+            LOOP
+                SELF.conceptos(m).validar;
+                IF (SELF.conceptos(m).errores.COUNT > 0) THEN
+                    FOR n IN SELF.conceptos(m).errores.FIRST .. SELF.conceptos(m).errores.LAST
+                    LOOP
+                        SELF.errores.EXTEND;
+                        SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR(SELF.conceptos(m).errores(n).mensaje);
+                    END LOOP;
+                END IF;
+            END LOOP;
+        ELSE
+            SELF.errores.EXTEND;
+            SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR('La transacción no existe en TBRAPPL o TBRACCD');
+        END IF;
+
+        -- IF ((SELF.impuestosTras.COUNT + SELF.impuestosRets.COUNT) > 0) THEN
+        -- --     SELF.errores.EXTEND;
+        -- --     SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR('La transacción no tiene impuestos en TVRFWTX');
+        -- -- ELSE
+        --     IF (SELF.impuestosTras.COUNT > 0) THEN
+        --         FOR p IN SELF.impuestosTras.FIRST .. SELF.impuestosTras.LAST
+        --         LOOP
+        --             SELF.impuestosTras(p).validar;
+        --             IF (SELF.impuestosTras(p).errores.COUNT > 0) THEN
+        --                 FOR q IN SELF.impuestosTras(p).errores.FIRST .. SELF.impuestosTras(p).errores.LAST
+        --                 LOOP
+        --                     SELF.errores.EXTEND;
+        --                     SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR(SELF.impuestosTras(p).errores(1).mensaje);
+        --                 END LOOP;
+        --             END IF;
+        --         END LOOP;
+        --     END IF;
+
+        --     IF (SELF.impuestosRets.COUNT > 0) THEN
+        --         FOR p IN SELF.impuestosRets.FIRST .. SELF.impuestosRets.LAST
+        --         LOOP
+        --             SELF.impuestosRets(p).validar;
+        --             IF (SELF.impuestosRets(p).errores.COUNT > 0) THEN
+        --                 FOR q IN SELF.impuestosRets(p).errores.FIRST .. SELF.impuestosRets(p).errores.LAST
+        --                 LOOP
+        --                     SELF.errores.EXTEND;
+        --                     SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR(SELF.impuestosRets(p).errores(1).mensaje);
+        --                 END LOOP;
+        --             END IF;
+        --         END LOOP;
+        --     END IF;
+        -- END IF;
+    END validar;
 END;

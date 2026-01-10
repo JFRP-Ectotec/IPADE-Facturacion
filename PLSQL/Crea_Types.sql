@@ -1099,6 +1099,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_06 AS
         SELF.sep := parent.sep;
 
         -- dbms_output.put_line('clave_impuesto:'||clave_impuesto);
+        SELF.estatus_debug := 'A';
+        SELF.REGISTRAR_DEBUG('linea_06', 'clave_impuesto:'||clave_impuesto);
+        SELF.estatus_debug := 'I';
 
         IF clave_impuesto LIKE '%IVA' THEN
             SELF.clave_impuesto := '002';
@@ -1522,7 +1525,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 SELF.conceptos(i).descripcion := 'PÚBLICO EN GENERAL';
             END LOOP;
         END IF;
-    END;
+    END ajustar_pubgral;
 
     MEMBER PROCEDURE validar IS
     BEGIN

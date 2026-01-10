@@ -165,7 +165,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pidm IN NUMBER,
         tran_number IN NUMBER,
         datosFactura IN TY_TRALIX_FACTURA,
-        numEntidad IN VARCHAR2) 
+        datosFacturaCP IN TY_TRALIX_COMPPAGO,
+        numEntidad IN VARCHAR2,
+        procesoFactura IN VARCHAR2) 
         RETURN CLOB IS
         vlc_nombreArchivo VARCHAR2(50 CHAR);
 
@@ -200,7 +202,11 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         gokjson.write('idSucursal', vlc_idSucursal);
         vlc_nombreArchivo := fn_generar_nombreArchivo(matricula, tran_number);
         gokjson.write('nombre', vlc_nombreArchivo);
-        gokjson.write('archivoFuente', datosFactura.imprimir_linea);
+        IF (procesoFactura = 'CP') THEN
+            gokjson.write('archivoFuente', datosFacturaCP.imprimir_linea);
+        ELSE
+            gokjson.write('archivoFuente', datosFactura.imprimir_linea);
+        END IF;
         gokjson.close_object;
 
         vlc_respuesta := gokjson.get_clob_output;
@@ -482,6 +488,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlc_respuesta CLOB;
         ipade_pidm NUMBER;
         datosFactura  TY_TRALIX_FACTURA;
+        datosCompPago TY_TRALIX_COMPPAGO;
         vlc_estatus VARCHAR2(50 CHAR);
         vlc_errores VARCHAR2(1000 CHAR);
 
@@ -514,6 +521,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlc_tipo_pago_banner VARCHAR2(10 CHAR);
 
         vlc_tipoFactura_TSTA VARCHAR2(2 CHAR) := 'FC';
+        vln_tran_number_orig NUMBER;
     BEGIN
         BEGIN
             vln_pidm := gb_common.f_get_pidm(matricula);
@@ -582,23 +590,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             vlc_tipo_pago_banner := '99';
         END IF;
 
-        datosFactura := ty_tralix_factura(matricula, tran_number, vlc_num_entidad, 
-            1, vlc_tipo_pago_banner, tipo_pago_facturar, proceso_factura);       
-
-        datosFactura.validar;
-        IF (datosFactura.errores.COUNT > 0) THEN
-            vlt_respuesta.estatus := 'ERROR';
-            FOR m IN datosFactura.errores.FIRST .. datosFactura.errores.LAST
-            LOOP
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := datosFactura.errores(m);
-            END LOOP;
-            -- vlc_respuesta := vlt_respuesta.imprimir_json();
-            pr_log_error(vln_pidm, '', vlt_respuesta.imprimir_json(),
-                vln_monto, tipo_pago_banner, tran_number);
-            RETURN vlt_respuesta;
-        END IF;
-        
         /* Obtener número de factura */
         vlc_prefijo := 'ZPB';
         IF (vlc_num_entidad = 1) THEN
@@ -646,18 +637,68 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         END IF;
         -- TEMPORAL
 
-        datosFactura.info_gral_comprobante.set_folio(vlc_prefijo, TO_CHAR(vln_numFactura));
-        IF pubgral THEN
-            datosFactura.receptor.datos_pubgral;
-            vlc_tipoFactura_TSTA := 'FP';
+        IF (proceso_factura != 'CP') THEN
+            datosFactura := ty_tralix_factura(matricula, tran_number, vlc_num_entidad, 
+                1, vlc_tipo_pago_banner, tipo_pago_facturar, proceso_factura);       
+
+            datosFactura.validar;
+            IF (datosFactura.errores.COUNT > 0) THEN
+                vlt_respuesta.estatus := 'ERROR';
+                FOR m IN datosFactura.errores.FIRST .. datosFactura.errores.LAST
+                LOOP
+                    vlt_respuesta.errores.EXTEND;
+                    vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := datosFactura.errores(m);
+                END LOOP;
+                -- vlc_respuesta := vlt_respuesta.imprimir_json();
+                pr_log_error(vln_pidm, '', vlt_respuesta.imprimir_json(),
+                    vln_monto, tipo_pago_banner, tran_number);
+                RETURN vlt_respuesta;
+            END IF;
+        
+            datosFactura.info_gral_comprobante.set_folio(vlc_prefijo, TO_CHAR(vln_numFactura));
+            IF pubgral THEN
+                datosFactura.receptor.datos_pubgral;
+                vlc_tipoFactura_TSTA := 'FP';
+            END IF;
+            datosFactura.ajustar_pubgral;
+        ELSE
+            FOR z IN (
+                SELECT tbrappl_chg_tran_number
+                FROM tbrappl
+                WHERE tbrappl_pidm = vln_pidm
+                    AND tbrappl_pay_tran_number = tran_number
+            ) LOOP
+                vln_tran_number_orig := z.tbrappl_chg_tran_number;
+            END LOOP;
+
+            datosCompPago := ty_tralix_comppago(matricula, tran_number, vln_tran_number_orig,
+                vlc_num_entidad, 1, vlc_tipo_pago_banner, tipo_pago_facturar);
+            datosCompPago.validar;
+            IF (datosCompPago.errores.COUNT > 0) THEN
+                vlt_respuesta.estatus := 'ERROR';
+                FOR m IN datosCompPago.errores.FIRST .. datosCompPago.errores.LAST
+                LOOP
+                    vlt_respuesta.errores.EXTEND;
+                    vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := datosCompPago.errores(m);
+                END LOOP;
+                -- vlc_respuesta := vlt_respuesta.imprimir_json();
+                pr_log_error(vln_pidm, '', vlt_respuesta.imprimir_json(),
+                    vln_monto, tipo_pago_banner, tran_number);
+                RETURN vlt_respuesta;
+            END IF;
+            datosCompPago.info_gral_comprobante.set_folio(vlc_prefijo, TO_CHAR(vln_numFactura));
+            IF pubgral THEN
+                datosCompPago.receptor.datos_pubgral;
+                vlc_tipoFactura_TSTA := 'FP';
+            END IF;
+            datosCompPago.ajustar_pubgral;
         END IF;
-        datosFactura.ajustar_pubgral;
         vlc_objeto_principal := crea_objeto_principal(matricula, vln_pidm, tran_number, 
-            datosFactura, vlc_num_entidad);
+            datosFactura, datosCompPago, vlc_num_entidad, proceso_factura);
+
         vlt_respuesta.mainData := vlc_objeto_principal;
 
         pr_registrar_debug('fn_factura_base_tralix', 'payload:' || vlc_objeto_principal);
-
         vlc_envioTralix := envio_factura_tralix(vlc_objeto_principal, vlb_estatusEnvio);
         vln_monto := 0;
 
@@ -674,10 +715,16 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             pr_registrar_debug('fn_factura_base_tralix', 'CON ERROR: ' || bufferMensaje);
 
             IF (NOT(pubgral) AND fn_reenviar(bufferMensaje)) THEN
-                datosFactura.receptor.datos_pubgral;
-                datosFactura.ajustar_pubgral;
+                IF (proceso_factura != 'CP') THEN
+                    datosFactura.receptor.datos_pubgral;
+                    datosFactura.ajustar_pubgral;
+                ELSE
+                    datosCompPago.receptor.datos_pubgral;
+                    datosCompPago.ajustar_pubgral;
+                END IF;
+
                 vlc_objeto_principal := crea_objeto_principal(matricula, vln_pidm, tran_number, 
-                    datosFactura, vlc_num_entidad);
+                    datosFactura, datosCompPago, vlc_num_entidad, proceso_factura);
                 vlt_respuesta.mainData := vlc_objeto_principal;
 
                 pr_registrar_debug('fn_factura_base_tralix', 'payload 2nd:' || vlc_objeto_principal);
@@ -702,10 +749,17 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 -- vlt_respuesta.errores.EXTEND;
                 -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
 
-                FOR j IN datosFactura.conceptos.FIRST .. datosFactura.conceptos.LAST
-                LOOP
-                    vln_monto := vln_monto + datosFactura.conceptos(j).importe;
-                END LOOP;
+                IF (proceso_factura != 'CP') THEN
+                    FOR j IN datosFactura.conceptos.FIRST .. datosFactura.conceptos.LAST
+                    LOOP
+                        vln_monto := vln_monto + datosFactura.conceptos(j).importe;
+                    END LOOP;
+                ELSE
+                    FOR j IN datosCompPago.conceptos.FIRST .. datosCompPago.conceptos.LAST
+                    LOOP
+                        vln_monto := vln_monto + datosCompPago.conceptos(j).importe;
+                    END LOOP;
+                END IF;
 
                 /* Guardar en TZRPAYS, con status = 'T' */
                 BEGIN
