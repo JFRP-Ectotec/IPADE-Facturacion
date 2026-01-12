@@ -67,6 +67,11 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
     separador constant varchar2(1) := '|';
+
+    FUNCTION existe_factura(
+        pin_pidm IN NUMBER,
+        pin_tran_number IN NUMBER)
+        RETURN BOOLEAN;
 END TZTRALX;
 /
 show errors;
@@ -1259,6 +1264,37 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         RETURN vlt_respuesta;
     END fn_factura_cp_tralix;
+
+    FUNCTION existe_factura(
+        pin_pidm IN NUMBER,
+        pin_tran_number IN NUMBER)
+        RETURN BOOLEAN IS
+        vlb_respuesta BOOLEAN := FALSE;
+        vln_contador NUMBER;
+    BEGIN
+        SELECT COUNT(*)
+        INTO vln_contador
+        FROM tbraccd t1
+            JOIN tbbdetc t2 ON (t1.tbraccd_detail_code = t2.tbbdetc_detail_code)
+        WHERE t1.tbraccd_pidm = pin_pidm
+            AND t1.tbraccd_tran_number = pin_tran_number
+            AND t2.tbbdetc_desc LIKE '%SPE_DEP%'
+            AND tbbdetc_type_ind = 'P'
+            AND tbbdetc_dcat_code = 'CSH'
+        ;
+
+        IF (vln_contador > 0) THEN
+            SELECT COUNT(*)
+            INTO vln_contador
+            FROM tzrpofi
+            WHERE tzrpofi_pidm = pin_pidm
+                AND tzrpofi_docnum_pos = pin_tran_number;
+
+            vlb_respuesta := (vln_contador > 0);
+        END IF;
+
+        RETURN vlb_respuesta;
+    END existe_factura;
 END TZTRALX;
 /
 show errors;

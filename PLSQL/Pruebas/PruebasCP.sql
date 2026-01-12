@@ -48,3 +48,24 @@ SELECT *
 FROM GOREMAL
 WHERE goremal_pidm = 108471
 ;
+
+SELECT t1.*
+FROM tbraccd t1 JOIN tbbdetc t2
+    ON (t1.tbraccd_detail_code = t2.tbbdetc_detail_code)
+    -- JOIN tzrpofi t3 on (t1.tbraccd_pidm = t3.tzrpofi_pidm
+    --     AND t1.tbraccd_tran_number = t3.tzrpofi_docnum_pos)
+WHERE t2.tbbdetc_desc LIKE '%SPE_DEP%'
+    AND t2.tbbdetc_type_ind = 'P'
+    AND t2.tbbdetc_dcat_code = 'CSH'
+;
+
+DECLARE
+    pidm NUMBER := 104744;
+    tran_number NUMBER := 114;
+BEGIN
+    IF (tztralx.existe_factura(pidm, tran_number)) THEN
+        dbms_output.put_line('Ya hay factura');
+    ELSE
+        dbms_output.put_line('No hay factura');
+    END IF;
+END;
