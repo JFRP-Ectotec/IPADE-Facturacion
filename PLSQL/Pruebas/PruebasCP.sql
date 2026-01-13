@@ -40,9 +40,24 @@ WHERE spriden_pidm = 104871;
 DECLARE
     objeto_prueba TY_TRALIX_COMPPAGO;
 BEGIN
-    objeto_prueba := TY_TRALIX_COMPPAGO('A00084798', 40, 37, 1, 1, '28', 'PUE');
+    objeto_prueba := TY_TRALIX_COMPPAGO('A00084989', 7, 6, 1, 1, '28', 'PUE');
     dbms_output.put_line(objeto_prueba.imprimir_linea);
 END;
+
+SELECT *
+FROM tbraccd
+WHERE tbraccd_pidm = 105062
+    AND tbraccd_tran_number = 7
+    AND tbraccd_tran_number_paid = 6
+;
+
+SELECT NVL(SUM(tbrappl_amount), 0) as saldoPagado,
+    COUNT(*) as numParcialidades
+FROM tbrappl
+WHERE tbrappl_pidm = 105062
+    AND tbrappl_chg_tran_number = 6
+    AND tbrappl_pay_tran_number < 7
+;
 
 SELECT *
 FROM GOREMAL
@@ -68,4 +83,30 @@ BEGIN
     ELSE
         dbms_output.put_line('No hay factura');
     END IF;
+END;
+
+SELECT *
+FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084989')
+;
+
+DECLARE
+	datos_banner CLOB;
+	matricula VARCHAR2(20 CHAR) := 'A00084989';
+	tran_number NUMBER := 7;
+	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
+	num_linea NUMBER := 1;
+BEGIN
+	vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '28');
+	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
+	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
+	--IF (vlt_respuesta.estatus != 'OK') THEN
+	IF (vlt_respuesta.errores.COUNT > 0) THEN
+		dbms_output.put_line(vlt_respuesta.errores.COUNT || ' errores');
+		FOR m IN vlt_respuesta.errores.FIRST .. vlt_respuesta.errores.LAST
+		LOOP
+			dbms_output.put_line(num_linea || ' - ' ||vlt_respuesta.errores(m).mensaje);
+			num_linea := num_linea + 1;
+		END LOOP;
+	END IF;
 END;

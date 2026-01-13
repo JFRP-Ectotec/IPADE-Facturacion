@@ -43,21 +43,21 @@ WHERE sorxref_banner_value = 'CAAD2'
 SELECT tvrtsta_seq_no, tvrtsta_tsta_code, 
 	tvrtsta_dloc_code, tvrtsta_comments
 FROM tvrtsta
-WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084985')
-    AND tvrtsta_tran_number = 9
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084989')
+    AND tvrtsta_tran_number = 6
 ;
 
 DELETE FROM tvrtsta
-WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084985')
-    AND tvrtsta_tran_number = 9
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084989')
+    AND tvrtsta_tran_number = 6
 ;
 
 COMMIT;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084985';
-	tran_number NUMBER := 9;
+	matricula VARCHAR2(20 CHAR) := 'A00084989';
+	tran_number NUMBER := 6;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN

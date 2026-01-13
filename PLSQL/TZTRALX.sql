@@ -527,14 +527,16 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         vlc_tipoFactura_TSTA VARCHAR2(2 CHAR) := 'FC';
         vln_tran_number_orig NUMBER;
+        vln_contador NUMBER;
     BEGIN
         BEGIN
             vln_pidm := gb_common.f_get_pidm(matricula);
         EXCEPTION
             WHEN OTHERS THEN
                 vlt_respuesta.estatus := 'ERROR';
-                vlt_respuesta.errores.EXTEND;
-                vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := datosFactura.errores('No existe la matrícula');
+                -- vlt_respuesta.errores.EXTEND;
+                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := datosFactura.errores('No existe la matrícula');
+                vlt_respuesta.agregar_error('No existe la matrícula');
                 RETURN vlt_respuesta;
         END;
 
@@ -666,7 +668,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 vlc_tipoFactura_TSTA := 'FP';
             END IF;
             datosFactura.ajustar_pubgral;
-        ELSE
+        ELSE   -- Complemento de Pago
             FOR z IN (
                 SELECT tbrappl_chg_tran_number
                 FROM tbrappl
@@ -676,9 +678,42 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 vln_tran_number_orig := z.tbrappl_chg_tran_number;
             END LOOP;
 
+            IF (NVL(vln_tran_number_orig, 0) = 0) THEN
+                FOR w IN (
+                SELECT tbraccd_tran_number_paid
+                FROM tbraccd
+                WHERE tbraccd_pidm = vln_pidm
+                    AND tbraccd_tran_number = tran_number
+                ) LOOP
+                    vln_tran_number_orig := w.tbraccd_tran_number_paid;
+                END LOOP;
+            END IF;
+
+            IF (NVL(vln_tran_number_orig, 0) = 0) THEN
+                vlt_respuesta.estatus := 'ERROR';
+                vlt_respuesta.agregar_error('El complemento no tiene una transacción válida para pagar.');
+                -- RETURN vlt_respuesta;   
+            END IF;
+
+            FOR x IN (
+                SELECT tvrtsta_dloc_code
+                FROM tvrtsta
+                WHERE tvrtsta_pidm = vln_pidm
+                    AND tvrtsta_tran_number = tran_number
+                    AND tvrtsta_tsta_code LIKE 'F0%'
+                ORDER BY 1 DESC
+            ) LOOP
+                IF (x.tvrtsta_dloc_code != 'PPD') THEN
+                    vlt_respuesta.estatus := 'ERROR';
+                    vlt_respuesta.agregar_error('La factura original no tiene un método de pago PPD.');
+                END IF;    
+                EXIT;
+            END LOOP;
+
+            -- vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
             datosCompPago := ty_tralix_comppago(matricula, tran_number, vln_tran_number_orig,
                 vlc_num_entidad, 1, vlc_tipo_pago_banner, tipo_pago_facturar);
-            datosCompPago.validar;
+            -- datosCompPago.validar;
             IF (datosCompPago.errores.COUNT > 0) THEN
                 vlt_respuesta.estatus := 'ERROR';
                 FOR m IN datosCompPago.errores.FIRST .. datosCompPago.errores.LAST
@@ -691,6 +726,10 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     vln_monto, tipo_pago_banner, tran_number);
                 RETURN vlt_respuesta;
             END IF;
+            -- datosCompPago.info_gral_comprobante.subTotalNum := 0;
+
+
+
             datosCompPago.info_gral_comprobante.set_folio(vlc_prefijo, TO_CHAR(vln_numFactura));
             IF pubgral THEN
                 datosCompPago.receptor.datos_pubgral;
@@ -704,6 +743,14 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlt_respuesta.mainData := vlc_objeto_principal;
 
         pr_registrar_debug('fn_factura_base_tralix', 'payload:' || vlc_objeto_principal);
+
+        vlt_respuesta.estatus := 'ERROR';
+        vlt_respuesta.agregar_error('No implementado aún.');
+        
+        IF (vlt_respuesta.estatus = 'ERROR') THEN
+            RETURN vlt_respuesta;
+        END IF;
+
         vlc_envioTralix := envio_factura_tralix(vlc_objeto_principal, vlb_estatusEnvio);
         vln_monto := 0;
 
@@ -1256,13 +1303,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
     BEGIN
-        vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
-        vlt_respuesta.estatus := 'ERROR';
-        vlt_respuesta.agregar_error('No implementado aún.');
-        -- vlt_respuesta.errores.EXTEND;
-        -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No implementado aún.');
-
-        RETURN vlt_respuesta;
+        RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
+            'PUE', etiqueta, 'CP');
     END fn_factura_cp_tralix;
 
     FUNCTION existe_factura(

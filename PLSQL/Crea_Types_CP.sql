@@ -59,13 +59,18 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
         SELF.TipoCambioP := 1;
 
         FOR i IN (
-            SELECT t1.tbrappl_amount
-            FROM tbrappl t1
-            WHERE t1.tbrappl_pidm = pidm
-                AND t1.tbrappl_pay_tran_number = tranNumberCP
-                AND t1.tbrappl_chg_tran_number = tranOriginal
+            -- SELECT t1.tbrappl_amount
+            -- FROM tbrappl t1
+            -- WHERE t1.tbrappl_pidm = pidm
+            --     AND t1.tbrappl_pay_tran_number = tranNumberCP
+            --     AND t1.tbrappl_chg_tran_number = tranOriginal
+            SELECT t1.tbraccd_amount
+            FROM tbraccd t1
+            WHERE t1.tbraccd_pidm = pidm
+                AND t1.tbraccd_tran_number = tranNumberCP
+                AND t1.tbraccd_tran_number_paid = tranOriginal
         ) LOOP
-            SELF.Monto := i.tbrappl_amount;
+            SELF.Monto := i.tbraccd_amount;
         END LOOP;
 
         RETURN;
@@ -163,11 +168,35 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
             SELF.totTrasladosImpIVA16 := i.tbrappl_amount * 0.16;
         END LOOP;
 
+        -- SELF.estatus_debug := 'A';
+        -- SELF.registrar_debug('TY_TRALIX_LINEA_COMPTOT', 'pidm: '||pidm||
+        --     ' tranNumber:'||tranNumberCP||' tranNumberOrig:'||tranOriginal);
+        
+
+        IF (NVL(SELF.totTrasladosBaseIVA16, 0) <= 0) THEN
+            FOR j IN (
+                SELECT tbraccd_amount
+                FROM tbraccd
+                WHERE tbraccd_pidm = pidm
+                    AND tbraccd_tran_number = tranNumberCP
+                    AND tbraccd_tran_number_paid = tranOriginal
+            ) LOOP
+
+                SELF.totTrasladosBaseIVA16 := j.tbraccd_amount;
+                SELF.totTrasladosImpIVA16 := j.tbraccd_amount * 0.16;
+
+                -- SELF.registrar_debug('TY_TRALIX_LINEA_COMPTOT', 'totTraslados: '||SELF.totTrasladosBaseIVA16);
+            END LOOP;
+        END IF;
+
         SELF.montoTotalPagos := NVL(SELF.totTrasladosBaseIVA16, 0)
             + NVL(SELF.totTrasladosBaseIVA8, 0)
             + NVL(SELF.totTrasladosBaseIVA0, 0)
             + NVL(SELF.totTrasladosBaseIVAEx, 0)
         ;
+
+        -- SELF.registrar_debug('TY_TRALIX_LINEA_COMPTOT', 'totalPagos: '||SELF.montoTotalPagos);
+        -- SELF.estatus_debug := 'I';
 
         RETURN;
     END TY_TRALIX_LINEA_COMPTOT;
@@ -248,16 +277,18 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
         SELF.objetoImpDR := '002';
 
         FOR i IN (
-            SELECT tbrappl_amount
-            FROM tbrappl
-            WHERE tbrappl_pidm = pidm
-                AND tbrappl_pay_tran_number = tranNumberCP
-                AND tbrappl_chg_tran_number = tranOriginal
+            -- SELECT tbrappl_amount
+            -- FROM tbrappl
+            -- WHERE tbrappl_pidm = pidm
+            --     AND tbrappl_pay_tran_number = tranNumberCP
+            --     AND tbrappl_chg_tran_number = tranOriginal
+            SELECT tbraccd_amount
+            FROM tbraccd
+            WHERE tbraccd_pidm = pidm
+                AND tbraccd_tran_number = tranNumberCP
         ) LOOP
-            SELF.impPagado := i.tbrappl_amount;
+            SELF.impPagado := i.tbraccd_amount;
         END LOOP;
-
-        dbms_output.put_line('impPagado 1:'||SELF.impPagado);
 
         FOR j IN (
             SELECT tbraccd_amount
@@ -266,8 +297,6 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
                 AND tbraccd_tran_number = tranOriginal
         ) LOOP
             SELF.impSaldoAnt := j.tbraccd_amount;
-
-            dbms_output.put_line('impSaldoAnt 1:'||SELF.impSaldoAnt);
         END LOOP;
 
         SELF.numParcialidad := 1;
@@ -279,16 +308,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
                 AND tbrappl_chg_tran_number = tranOriginal
                 AND tbrappl_pay_tran_number < tranNumberCP
         ) LOOP
-            -- saldoPagado := m.saldoPagado;
-
-            dbms_output.put_line('Entra aqui');
             SELF.impSaldoAnt := SELF.impSaldoAnt - m.saldoPagado;
             SELF.numParcialidad := m.numParcialidades + 1;
         END LOOP;
 
-        -- IF (SELF.numParcialidad > 1) THEN
-            SELF.impSaldoInsoluto := SELF.impSaldoAnt - SELF.impPagado;
-        -- END IF;
+        SELF.impSaldoInsoluto := SELF.impSaldoAnt - SELF.impPagado;
 
         FOR k IN (
             SELECT TZRPOFI_IAC_CDE, TZRPOFI_SDOC_CODE,
@@ -467,7 +491,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
 
         IF (NVL(SELF.envio_automatico.eMail, '*') != '*') THEN
             numLineas := numLineas + 1;
-            SELF.registrar_debug('TY_TRALIX_COMPPAGO', 'numLineas:'||numLineas);
+            -- SELF.registrar_debug('TY_TRALIX_COMPPAGO', 'numLineas:'||numLineas);
         END IF;
         
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, 
@@ -475,6 +499,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         SELF.info_gral_comprobante.metodoPago := '';
         SELF.info_gral_comprobante.formaPago := '';
         SELF.info_gral_comprobante.tipoComprobante := 'P';
+        SELF.info_gral_comprobante.subTotalNum := 0;
         numLineas := numLineas + 1;
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
 
@@ -515,6 +540,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             --     AND tbraccd_srce_code = 'Z';
 
             concepto := TY_TRALIX_LINEA_05(vln_pidm, tranNumber);
+            concepto.valorUnitario := 0;
+            concepto.importe := 0;
             concepto.claveUnidad := 'ACT';  -- Revisar si es el deber ser. TEMPORAL
             -- Considerar modifcar concepto.importe
             
@@ -534,6 +561,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
 
         numLineas := numLineas + SELF.conceptos.COUNT
             + SELF.impuestos_DR.COUNT + SELF.impuestos_P.COUNT;
+
+        SELF.info_gral_comprobante.set_cargos(0, NULL);
 
         numLineas := numLineas + 1;
         SELF.finCfdi := ty_tralix_linea_99(numLineas);
