@@ -56,8 +56,8 @@ COMMIT;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084989';
-	tran_number NUMBER := 6;
+	matricula VARCHAR2(20 CHAR) := 'A00084990';
+	tran_number NUMBER := 15;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN

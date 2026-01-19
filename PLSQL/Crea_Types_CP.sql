@@ -148,14 +148,14 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
 
-        SELF.totRetencionesIVA := 0;
-        SELF.totRetencionesISR := 0;
-        SELF.totRetencionesIEPS := 0;
-        SELF.totTrasladosBaseIVA8 := 0;
-        SELF.totTrasladosImpIVA8 := 0;
-        SELF.totTrasladosBaseIVA0 := 0;
-        SELF.totTrasladosImpIVA0 := 0;
-        SELF.totTrasladosBaseIVAEx := 0;
+        SELF.totRetencionesIVA := NULL;
+        SELF.totRetencionesISR := NULL;
+        SELF.totRetencionesIEPS := NULL;
+        SELF.totTrasladosBaseIVA8 := NULL;
+        SELF.totTrasladosImpIVA8 := NULL;
+        SELF.totTrasladosBaseIVA0 := NULL;
+        SELF.totTrasladosImpIVA0 := NULL;
+        SELF.totTrasladosBaseIVAEx := NULL;
 
         FOR i IN (
             SELECT tbrappl_amount
@@ -274,7 +274,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
 
         SELF.idPagos := idPagos;
         SELF.idImpuestoDR := idPagos;
-        SELF.objetoImpDR := '002';
+        SELF.objetoImpDR := '02';
 
         FOR i IN (
             -- SELECT tbrappl_amount
@@ -301,12 +301,18 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
 
         SELF.numParcialidad := 1;
         FOR m IN (
-            SELECT NVL(SUM(tbrappl_amount), 0) as saldoPagado,
+            -- SELECT NVL(SUM(tbrappl_amount), 0) as saldoPagado,
+            --     COUNT(*) as numParcialidades
+            -- FROM tbrappl
+            -- WHERE tbrappl_pidm = pidm
+            --     AND tbrappl_chg_tran_number = tranOriginal
+            --     AND tbrappl_pay_tran_number < tranNumberCP
+            SELECT NVL(SUM(tbraccd_amount), 0) as saldoPagado,
                 COUNT(*) as numParcialidades
-            FROM tbrappl
-            WHERE tbrappl_pidm = pidm
-                AND tbrappl_chg_tran_number = tranOriginal
-                AND tbrappl_pay_tran_number < tranNumberCP
+            FROM tbraccd
+            WHERE tbraccd_pidm = pidm
+                AND tbraccd_tran_number < tranNumberCP
+                AND tbraccd_tran_number_paid = tranOriginal
         ) LOOP
             SELF.impSaldoAnt := SELF.impSaldoAnt - m.saldoPagado;
             SELF.numParcialidad := m.numParcialidades + 1;
@@ -329,6 +335,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
         END LOOP;
 
         SELF.monedaDR := 'MXN';  /* TEMPORAL */
+        SELF.equivalenciaDR := 1;
 
         RETURN;
     END TY_TRALIX_LINEA_COMPDOCTREL;
@@ -482,8 +489,27 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         numLineas NUMBER := 0;
         concepto TY_TRALIX_LINEA_05;
     BEGIN
-        idPagos := matricula || '_' || TRIM(TO_CHAR(tranNumber, '000000'));
         vln_pidm := gb_common.f_get_pidm(matricula);
+
+        SELECT COUNT(*)
+        INTO numLineas
+        FROM tvrtsta
+        WHERE tvrtsta_pidm = vln_pidm
+            AND tvrtsta_tran_number = tranOriginal
+            AND (
+                (tvrtsta_tsta_code LIKE 'T0%' AND tvrtsta_dloc_code = 'FA')
+                OR (tvrtsta_tsta_code LIKE 'F0%' AND tvrtsta_dloc_code = 'PPD'))
+        ;
+
+        IF (numLineas < 2) THEN
+            SELF.errores := TY_TRALIX_ARR_ERROR();
+            SELF.errores.EXTEND;
+            SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR('La transacción a la que se desea generar complemento no es PPD ni es Factura Anticipada, o no está timbrada en Tralix.');
+        
+            RETURN;
+        END IF;
+
+        idPagos := matricula || '_' || TRIM(TO_CHAR(tranNumber, '000000'));
         SELF.inicio_archivo := ty_tralix_linea_00(idPagos || '.txt', 'PPD');
         numLineas := numLineas + 1;
 
@@ -500,12 +526,19 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         SELF.info_gral_comprobante.formaPago := '';
         SELF.info_gral_comprobante.tipoComprobante := 'P';
         SELF.info_gral_comprobante.subTotalNum := 0;
+        SELF.info_gral_comprobante.moneda := 'XXX';
         numLineas := numLineas + 1;
+
+        SELF.estatus_debug := 'A';
+        REGISTRAR_DEBUG('TY_TRALIX_COMPPAGO', SELF.info_gral_comprobante.imprimir_linea);
+        SELF.estatus_debug := 'I';
+
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
 
         IF (SELF.receptor.esPubGral = 'TRUE') THEN
             SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;
         END IF;
+        SELF.receptor.usoCFDI := 'CP01';
 
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
         numLineas := numLineas + 1;
@@ -540,8 +573,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             --     AND tbraccd_srce_code = 'Z';
 
             concepto := TY_TRALIX_LINEA_05(vln_pidm, tranNumber);
+            concepto.clave_servicio := '84111506';
+            concepto.descripcion := 'Pago';
             concepto.valorUnitario := 0;
             concepto.importe := 0;
+            concepto.ObjetoImp := '01';
             concepto.claveUnidad := 'ACT';  -- Revisar si es el deber ser. TEMPORAL
             -- Considerar modifcar concepto.importe
             
@@ -563,6 +599,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             + SELF.impuestos_DR.COUNT + SELF.impuestos_P.COUNT;
 
         SELF.info_gral_comprobante.set_cargos(0, NULL);
+        SELF.info_gral_comprobante.tipoCambio := '';
 
         numLineas := numLineas + 1;
         SELF.finCfdi := ty_tralix_linea_99(numLineas);
@@ -646,6 +683,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
 
     MEMBER PROCEDURE validar IS
     BEGIN
+        IF (SELF.errores.COUNT > 0) THEN
+            RETURN;
+        END IF;
         SELF.errores := TY_TRALIX_ARR_ERROR();
         SELF.inicio_archivo.validar;
         IF (SELF.inicio_archivo.errores.COUNT > 0) THEN
@@ -689,6 +729,16 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         ELSE
             SELF.errores.EXTEND;
             SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR('La transacción no existe en TBRAPPL o TBRACCD');
+        END IF;
+
+        IF (SELF.compPagos.Monto < 0) THEN
+            SELF.errores.EXTEND;
+            SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR('El monto a registrar del pago no puede ser negativo.');
+        END IF;
+
+        IF (NVL(SELF.doctoRel.uuidPagoOriginal, '|') = '|') THEN
+            SELF.errores.EXTEND;
+            SELF.errores(SELF.errores.COUNT) := TY_TRALIX_ROW_ERROR('La factura anticipada no está timbrada en Tralix.');
         END IF;
 
         -- IF ((SELF.impuestosTras.COUNT + SELF.impuestosRets.COUNT) > 0) THEN

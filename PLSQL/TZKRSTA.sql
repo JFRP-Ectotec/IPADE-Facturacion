@@ -2,8 +2,10 @@ CREATE OR REPLACE PACKAGE TZKRSTA IS
     FUNCTION fn_registrar(
         pidm IN NUMBER,
         tran_number IN NUMBER,
+        tran_number_orig IN NUMBER,
         uuidTralix IN VARCHAR2,
         datos_factura IN TY_TRALIX_FACTURA,
+        datos_compPago IN TY_TRALIX_COMPPAGO,
         tipo_factura IN VARCHAR2)
         RETURN VARCHAR2;
 
@@ -17,13 +19,13 @@ CREATE OR REPLACE PACKAGE TZKRSTA IS
         pidm_canc IN NUMBER,
         tran_number_canc IN NUMBER,
         motivo_sust IN VARCHAR2) 
-        RETURN VARCHAR2;    
+        RETURN VARCHAR2;  
 END TZKRSTA;
 /
 show errors;
 
 CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
-    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'I'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'A'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
 	cgc_raiz_debug        CONSTANT VARCHAR2(100) := 'TZKRSTA-';
 
     PROCEDURE pr_registrar_debug (
@@ -209,35 +211,35 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
     FUNCTION fn_registrar_direccion_fiscal(
         pidm in NUMBER,
         tran_number IN NUMBER,
-        datos_factura IN TY_TRALIX_FACTURA,
+        receptor IN TY_TRALIX_LINEA_03,
         registros IN OUT TY_TRALIX_TSTA_ARR
     ) RETURN VARCHAR2 IS
         vlc_comment tvrtsta.tvrtsta_comments%TYPE;
     BEGIN
-        pr_registrar_debug('fn_registrar_direccion_fiscal',datos_factura.receptor.imprimir_linea);
+        pr_registrar_debug('fn_registrar_direccion_fiscal', receptor.imprimir_linea);
 
-        vlc_comment := datos_factura.receptor.calle;
+        vlc_comment := receptor.calle;
         pr_registrar_tvsta('CL1', '', vlc_comment, registros);
         
-        vlc_comment := datos_factura.receptor.numExterior;
+        vlc_comment := receptor.numExterior;
         pr_registrar_tvsta('CL2', '', vlc_comment, registros);
         
-        vlc_comment := datos_factura.receptor.colonia;
+        vlc_comment := receptor.colonia;
         pr_registrar_tvsta('CL3', '', vlc_comment, registros);
         
-        vlc_comment := datos_factura.receptor.localidad;
+        vlc_comment := receptor.localidad;
         pr_registrar_tvsta('CIT', '', vlc_comment, registros);
         
-        vlc_comment := datos_factura.receptor.estado;
+        vlc_comment := receptor.estado;
         pr_registrar_tvsta('STA', '', vlc_comment, registros);
         
-        vlc_comment := datos_factura.receptor.domFiscal;
+        vlc_comment := receptor.domFiscal;
         pr_registrar_tvsta('ZIP', '', vlc_comment, registros);
         
-        vlc_comment := datos_factura.receptor.municipio;
+        vlc_comment := receptor.municipio;
         pr_registrar_tvsta('CNT', '', vlc_comment, registros);
         
-        vlc_comment := datos_factura.receptor.pais;
+        vlc_comment := receptor.pais;
         pr_registrar_tvsta('NAT', '', vlc_comment, registros);
         
         -- END LOOP;
@@ -251,7 +253,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
     FUNCTION fn_registrar_datos_fiscales(
         pidm in NUMBER,
         tran_number IN NUMBER,
-        datos_factura IN TY_TRALIX_FACTURA,
+        receptor IN TY_TRALIX_LINEA_03,
         registros IN OUT TY_TRALIX_TSTA_ARR
     ) RETURN VARCHAR2 IS
         numGrupo NUMBER := 0;
@@ -263,27 +265,27 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         vlc_valor tvrtsta.tvrtsta_comments%TYPE;
 
     BEGIN
-        numGrupo := datos_factura.receptor.numGrupo;
+        numGrupo := receptor.numGrupo;
         vlc_codigo := 'FC'||numGrupo;
-        vlc_valor := datos_factura.receptor.rfc;
+        vlc_valor := receptor.rfc;
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar_datos_fiscales',vlc_codigo||' - '||vlc_valor);
 
         vlc_codigo := 'RF'||numGrupo;
-        vlc_valor := datos_factura.receptor.regimenFiscal;
+        vlc_valor := receptor.regimenFiscal;
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar_datos_fiscales',vlc_codigo||' - '||vlc_valor);
 
         /* TODO: Ajustar a que segmente en varchar de 50 datos_factura.receptor.nombre */
-        vlc_temporal := datos_factura.receptor.nombre;
+        vlc_temporal := receptor.nombre;
         vlc_razonSocial := '';
 
-        pr_registrar_debug('fn_registrar_tipo_factura',vlc_temporal||' ('||LENGTH(vlc_temporal)||')');
+        pr_registrar_debug('fn_registrar_datos_fiscales',vlc_temporal||' ('||LENGTH(vlc_temporal)||')');
 
         WHILE (LENGTH(vlc_temporal) > 100)
         LOOP
             vlc_razonSocial := SUBSTR(vlc_temporal, 1, 100);
-            pr_registrar_debug('fn_registrar_tipo_factura', 'SubSeccion:'||vln_regSocial||' Razon Social Temp:'||vlc_razonSocial);
+            pr_registrar_debug('fn_registrar_datos_fiscales', 'SubSeccion:'||vln_regSocial||' Razon Social Temp:'||vlc_razonSocial);
 
             vlc_codigo := numGrupo||'R'||vln_regSocial;
             vlc_valor := vlc_razonSocial;
@@ -292,7 +294,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
             vln_regSocial := vln_regSocial + 1;
             vlc_temporal := SUBSTR(vlc_temporal, 101, 500);
-            pr_registrar_debug('fn_registrar_tipo_factura','Nva subseccion:'||vln_regSocial||' '||
+            pr_registrar_debug('fn_registrar_datos_fiscales','Nva subseccion:'||vln_regSocial||' '||
                 vlc_temporal||' ('||LENGTH(vlc_temporal)||')');
         END LOOP;
 
@@ -304,7 +306,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         pr_registrar_debug('fn_registrar_datos_fiscales',vlc_codigo||' - '||vlc_valor);
 
         vlc_codigo := 'UF'||numGrupo;
-        vlc_valor := datos_factura.receptor.usoCFDI;
+        vlc_valor := receptor.usoCFDI;
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar_datos_fiscales',vlc_codigo||' - '||vlc_valor);
 
@@ -317,8 +319,10 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
     FUNCTION fn_registrar(
         pidm IN NUMBER,
         tran_number IN NUMBER,
+        tran_number_orig IN NUMBER,
         uuidTralix IN VARCHAR2,
         datos_factura IN TY_TRALIX_FACTURA,
+        datos_compPago IN TY_TRALIX_COMPPAGO,
         tipo_factura IN VARCHAR2)
         RETURN VARCHAR2 IS
 
@@ -327,26 +331,35 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
         vlc_codigo VARCHAR2(3 CHAR);
         vlc_valor tvrtsta.tvrtsta_comments%TYPE;
+        vlc_dloc tvrtsta.tvrtsta_dloc_code%TYPE;
 
         registros TY_TRALIX_TSTA_ARR;
+        receptor TY_TRALIX_LINEA_03;
+        secuencial NUMBER;
     BEGIN
         registros := TY_TRALIX_TSTA_ARR();
 
+        vlc_valor := datos_factura.info_gral_comprobante.cfdi;
+        IF (tipo_factura = 'FP') THEN
+            vlc_valor := datos_compPago.info_gral_comprobante.cfdi;
+        END IF;
+
         vlc_respCall := fn_registrar_tipo_factura(pidm, tran_number, tipo_factura, 
-            datos_factura.info_gral_comprobante.cfdi, registros);
+            vlc_valor, registros);
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             return vlc_respCall;
         END IF;
 
-        pr_registrar_debug('fn_registrar','F'||vlc_seqCodigo);
+        -- pr_registrar_debug('fn_registrar','F'||vlc_seqCodigo);
         vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, 'F');
-        pr_registrar_debug('fn_registrar','F'||vlc_seqCodigo);
+        -- pr_registrar_debug('fn_registrar','F'||vlc_seqCodigo);
         vlc_codigo := 'F'||vlc_seqCodigo;
-        vlc_valor := datos_factura.info_gral_comprobante.cfdi;  
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
-        pr_registrar_tvsta(vlc_codigo, datos_factura.info_gral_comprobante.metodoPago, 
-            vlc_valor, registros);
-        
+        vlc_dloc := datos_factura.info_gral_comprobante.metodoPago;
+        IF (tipo_factura = 'FP') THEN
+            vlc_dloc := 'PUE';
+        END IF;
+        pr_registrar_tvsta(vlc_codigo, vlc_dloc, vlc_valor, registros);
 
         -- pr_registrar_tvsta('SOC', '', datos_factura.sociedad, registros);
         vlc_codigo := 'SOC';
@@ -355,8 +368,11 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
 
         vlc_seqCodigo := SUBSTR(vlc_seqCodigo, 2, 1);
-        vlc_codigo := 'FV'||vlc_seqCodigo;
-        vlc_valor := TO_CHAR(datos_factura.info_gral_comprobante.fecha, 'DD-MON-YYYY');  
+        vlc_codigo := 'FV'||vlc_seqCodigo;        
+        vlc_valor := TO_CHAR(datos_factura.info_gral_comprobante.fecha, 'DD-MON-YYYY');
+        IF (tipo_factura = 'FP') THEN
+            vlc_valor := TO_CHAR(datos_compPago.info_gral_comprobante.fecha, 'DD-MON-YYYY');
+        END IF;
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
 
@@ -375,12 +391,21 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         -- pr_registrar_tvsta('FP'||vlc_seqCodigo, '', datos_factura.formaPago, registros);
         vlc_codigo := 'FP'||vlc_seqCodigo;
         vlc_valor := datos_factura.info_gral_comprobante.metodoPago;
+        IF (tipo_factura = 'FP') THEN
+            vlc_valor := 'PUE';
+        END IF;
+
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
         -- vln_secuencial := vln_secuencial + 1;
+        
+        receptor := datos_factura.receptor;
+        IF (tipo_factura = 'FP') THEN
+            receptor := datos_comppago.receptor;
+        END IF;
         vlc_respCall := fn_registrar_datos_fiscales(
             pidm, tran_number, 
-            datos_factura, 
+            receptor, 
             registros
         );
 
@@ -389,15 +414,46 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         END IF;
 
         vlc_respCall := fn_registrar_direccion_fiscal(
-            pidm, tran_number, datos_factura, registros
+            pidm, tran_number, receptor, registros
         );
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             RETURN vlc_respCall;
         END IF;
 
+        IF (tipo_factura = 'FP') THEN
+            vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, 'DR');
+            vlc_codigo := 'DR'||vlc_seqCodigo;
+            vlc_valor := datos_compPago.doctoRel.uuidPagoOriginal;
+
+            pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
+        END IF;
+
         vlc_respCall := fn_insertar_tvrtsta(pidm, tran_number, registros);
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             RETURN vlc_respCall;
+        END IF;
+
+        IF (tipo_factura = 'FP') THEN
+            SELECT NVL(MAX(tvrtsta_seq_no), 0) + 1
+            INTO secuencial
+            FROM tvrtsta
+            WHERE tvrtsta_pidm = pidm
+                AND tvrtsta_tran_number = tran_number_orig
+            ;
+
+            vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, 'UI');
+
+            INSERT INTO TAISMGR.TVRTSTA (
+                TVRTSTA_PIDM, TVRTSTA_TRAN_NUMBER, TVRTSTA_SEQ_NO, 
+                TVRTSTA_TSTA_CODE, TVRTSTA_DATE_TSTA, 
+                TVRTSTA_DLOC_CODE, TVRTSTA_COMMENTS, 
+                TVRTSTA_ACTIVITY_DATE, TVRTSTA_USER_ID, TVRTSTA_DATA_ORIGIN
+            ) VALUES (
+                pidm, tran_number_orig, secuencial,
+                'UI'||vlc_seqCodigo, SYSDATE,
+                '', uuidTralix,
+                SYSDATE, USER, 'Tralix'
+            );
         END IF;
 
         -- COMMIT;
