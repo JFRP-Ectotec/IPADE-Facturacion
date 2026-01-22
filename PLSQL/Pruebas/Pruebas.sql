@@ -186,9 +186,26 @@ WHERE s.spriden_id = 'A00084606'
 ORDER BY t.tzrpofi_doc_number DESC
 ;
 
+SELECT *
+FROM goradid
+WHERE goradid_pidm = gb_common.f_get_pidm('A00085002')
+;
+
+delete from tzrpofi
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085002')
+	AND tzrpofi_docnum_pos = 20
+;
+
+delete from tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085002')
+	AND tvrtsta_tran_number = 20
+;
+
+COMMIT;
+
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084985';
+	matricula VARCHAR2(20 CHAR) := 'A00085002';
 	tran_number NUMBER := 20;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
@@ -288,6 +305,11 @@ WHERE goradid_pidm = 30263
 SELECT *
 FROM spraddr 
 WHERE spraddr_pidm = 30263
+;
+
+SELECT *
+FROM tvvtsta
+WHERE tvvtsta_code LIKE 'UF%'
 ;
 
 SELECT tt.tvrtsta_tran_number, tt.tvrtsta_tsta_code, tt.tvrtsta_dloc_code,

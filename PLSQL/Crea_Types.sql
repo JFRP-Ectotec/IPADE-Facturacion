@@ -530,6 +530,13 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
             EXIT;
         END LOOP;
 
+        IF (NVL(SELF.numGrupo, 0) < 0) THEN
+            SELF.esPubGral := 'TRUE';
+            SELF.datos_pubgral;
+            SELF.nombre := SELF.nombreParticipante;
+            RETURN;
+        END IF;
+
         /* Buscando valores para regimenFiscal y usoCFDI */
         -- IF (SELF.rfc != '') THEN
             FOR r IN (
@@ -725,7 +732,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
         SELF.esPubGral := 'TRUE';
 
         SELF.nombreParticipante := 'PÚBLICO EN GENERAL';
-        SELF.programa := '';
+        -- SELF.programa := '';
     END datos_pubgral;
 
     MEMBER FUNCTION esParaPubGral RETURN BOOLEAN IS
@@ -827,9 +834,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
              /* Localizar que transacción pagó, y si es determinado tipo le cambia SELF.descripcion */  
             descTemporal := desplegar_programa(pidm, tranNumber);
 
-            -- SELF.estatus_debug := 'A';
-            -- SELF.estatus_debug := 'I';
-            
+            SELF.estatus_debug := 'A';
+            SELF.REGISTRAR_DEBUG('linea_05', 'desplegar_programa:'||descTemporal||' pidm:'||pidm||' tranNumber:'||tranNumber);
+            SELF.estatus_debug := 'I';
+
             IF descTemporal != '|' THEN
                 SELF.descripcion := descTemporal;
             END IF;
@@ -850,11 +858,12 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
 
             SELECT NVL(SUM(tbraccd_amount), 0)
             INTO totImpuestos
-            FROM tbraccd t JOIN spriden s
-                ON (t.tbraccd_pidm = s.spriden_pidm)
-            WHERE tbraccd_tran_number != tranNumber
+            FROM tbraccd t
+            WHERE tbraccd_pidm = pidm
+                AND tbraccd_tran_number != tranNumber
                 AND tbraccd_receipt_number = i.tbraccd_receipt_number
-                AND tbraccd_srce_code = 'Z';
+                AND tbraccd_srce_code = 'Z'
+            ;
 
             SELF.valorUnitario := i.tbraccd_amount - totImpuestos;
             SELF.importe := SELF.valorUnitario;
@@ -1099,9 +1108,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_06 AS
         SELF.sep := parent.sep;
 
         -- dbms_output.put_line('clave_impuesto:'||clave_impuesto);
-        SELF.estatus_debug := 'A';
-        SELF.REGISTRAR_DEBUG('linea_06', 'clave_impuesto:'||clave_impuesto);
-        SELF.estatus_debug := 'I';
+        -- SELF.estatus_debug := 'A';
+        -- SELF.REGISTRAR_DEBUG('linea_06', 'clave_impuesto:'||clave_impuesto);
+        -- SELF.estatus_debug := 'I';
 
         IF clave_impuesto LIKE '%IVA' THEN
             SELF.clave_impuesto := '002';
@@ -1355,7 +1364,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
     impuestosTras TY_TRALIX_ARR_06,
     impuestosRets TY_TRALIX_ARR_07,
     errores TY_TRALIX_ARR_ERROR,
-
+    estatus_debug  VARCHAR2(1 CHAR), --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+	raiz_debug     VARCHAR2(100 CHAR),
     /* TODO: Agregar en este constructor si se va a enviar a PubGral o no */
     CONSTRUCTOR FUNCTION TY_TRALIX_FACTURA(
         matricula VARCHAR2,
@@ -1364,7 +1374,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
         difEmpresa VARCHAR2,
         formaPago VARCHAR2,
         metodoPago VARCHAR2,
-        procesoFactura VARCHAR2
+        procesoFactura VARCHAR2,
+        tranOriginalAntic NUMBER
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
     MEMBER PROCEDURE ajustar_pubgral,
@@ -1372,7 +1383,9 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
     MEMBER PROCEDURE impuestos_default(pidm NUMBER, tranNumber NUMBER,
         totalCargos OUT NUMBER, impTrasladados OUT NUMBER),
     MEMBER PROCEDURE impuestos_anticipada(pidm NUMBER, tranNumber NUMBER,
-        totalCargos OUT NUMBER, impTrasladados OUT NUMBER)
+        totalCargos OUT NUMBER, impTrasladados OUT NUMBER),
+    MEMBER PROCEDURE ajusta_conceptos(pidm NUMBER, tranOriginal NUMBER),
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2)
 ) NOT FINAL INSTANTIABLE
 ;
 
@@ -1384,7 +1397,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         difEmpresa VARCHAR2,
         formaPago VARCHAR2,
         metodoPago VARCHAR2,
-        procesoFactura VARCHAR2
+        procesoFactura VARCHAR2,
+        tranOriginalAntic NUMBER
     ) RETURN SELF AS RESULT IS
         concepto TY_TRALIX_LINEA_05;
         -- impuestoTras TY_TRALIX_LINEA_06;
@@ -1407,6 +1421,9 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         -- vln_subTotal TBRACCD.TBRACCD_AMOUNT%TYPE;
         -- vlc_detalleImp TBRACCD.TBRACCD_DETAIL_CODE%TYPE;
     BEGIN
+        SELF.estatus_debug := 'I';
+        SELF.raiz_debug := 'Linea_factura';
+
         vlc_nombreArchivo := matricula || '_' || tranNumber || '.txt';
         SELF.inicio_archivo := ty_tralix_linea_00(vlc_nombreArchivo);
         numLineas := numLineas + 1;
@@ -1440,6 +1457,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
         IF (procesoFactura = 'ANT') THEN
             impuestos_anticipada(vln_pidm, tranNumber, totalCargos, impTrasladados);
+            ajusta_conceptos(vln_pidm, tranOriginalAntic);
         ELSE
             impuestos_default(vln_pidm, tranNumber, totalCargos, impTrasladados);
         END IF;
@@ -1750,10 +1768,11 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         ) LOOP
             IF (generarImpuestos) THEN
                 vlb_exento := FALSE;
-                vln_subTotal := j.tbraccd_amount / 1.16;
-                vln_sumaImpuestos := j.tbraccd_amount - vln_subTotal;
+                vln_subTotal := j.tbraccd_amount; -- / 1.16;
+                vln_sumaImpuestos := j.tbraccd_amount * 0.16;  --j.tbraccd_amount - vln_subTotal;
                 concepto := TY_TRALIX_LINEA_05(pidm, tranNumber);
-                concepto.importe := vln_subTotal;
+                concepto.valorUnitario := j.tbraccd_amount + vln_sumaImpuestos;
+                concepto.importe := j.tbraccd_amount;
                 SELF.conceptos.EXTEND;
                 SELF.conceptos(SELF.conceptos.COUNT) := concepto;
 
@@ -1761,15 +1780,15 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
                 impuestoTras := TY_TRALIX_LINEA_06(
                     vlc_detalleImp, 
-                    vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
+                    vln_sumaImpuestos / j.tbraccd_amount,
                     vln_sumaImpuestos,
-                    j.tbraccd_amount - vln_sumaImpuestos);
+                    j.tbraccd_amount);
 
                 impTrasladados := impTrasladados + vln_sumaImpuestos;
 
                 concImpTrasRow := TY_TRALIX_LINEA_05C(
                     concepto.idConcepto,
-                    j.tbraccd_amount - vln_sumaImpuestos,
+                    j.tbraccd_amount /*- vln_sumaImpuestos*/,
                     vlc_detalleImp,
                     -- vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
                     impuestoTras.tasaCuota,
@@ -1806,6 +1825,93 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             SELF.concImpTras(SELF.concImpTras.COUNT) := concImpTrasRow;
         END LOOP;
     END impuestos_anticipada;
+
+    MEMBER PROCEDURE ajusta_conceptos(pidm NUMBER, tranOriginal NUMBER) IS
+        vlc_codigo_detalle  TBRACCD.TBRACCD_DETAIL_CODE%TYPE;
+        vlc_descripcion VARCHAR2(100 CHAR);
+        vln_contador NUMBER;
+    BEGIN
+        SELF.estatus_debug := 'A';
+        SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'pidm:'||pidm||' tranOriginal:'||tranOriginal);
+
+        IF (tranOriginal <= 0) THEN
+            RETURN;
+        END IF;
+
+        FOR i IN (
+            SELECT t1.tbraccd_detail_code,
+                t2.tbbdetc_desc
+            FROM tbraccd t1 JOIN tbbdetc t2
+                ON (t1.tbraccd_detail_code = t2.tbbdetc_detail_code)
+            WHERE t1.tbraccd_pidm = pidm
+                AND t1.tbraccd_tran_number = tranOriginal
+        ) LOOP
+            vlc_codigo_detalle := i.tbraccd_detail_code;
+            vlc_descripcion := i.tbbdetc_desc;
+        END LOOP;
+
+        SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'Zona 1 vlc_descripcion:'||vlc_descripcion);
+
+        SELECT COUNT(*)
+        INTO vln_contador
+        FROM gtvsdax
+        WHERE GTVSDAX_EXTERNAL_CODE = 'TRALIX_FACT'
+            AND GTVSDAX_INTERNAL_CODE = 'DESP_PROG'
+            AND ','||GTVSDAX_COMMENTS||',' LIKE '%,'||vlc_codigo_detalle||',%'
+        ;
+
+        IF (vln_contador = 0) THEN
+            -- Buscar el programa
+            FOR k IN (
+                SELECT p.smrprle_levl_code, p.smrprle_program_desc
+                FROM sovlcur s
+                    JOIN smrprle p ON (s.sovlcur_program = p.smrprle_program)
+                WHERE s.sovlcur_pidm = pidm
+                    AND s.sovlcur_active_ind = 'Y'
+            ) LOOP
+                vlc_descripcion := k.smrprle_program_desc;
+            END LOOP;
+        END IF;
+
+        SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'Zona 2 vlc_descripcion:'||vlc_descripcion);
+
+
+        FOR m IN (
+            SELECT LISTAGG(tbracdt_text, ' ') WITHIN GROUP(ORDER BY tbracdt_seq_number) as texto_adicional
+            FROM tbracdt
+            WHERE tbracdt_pidm = pidm
+                and tbracdt_tran_number = tranOriginal
+        ) LOOP
+            vlc_descripcion := vlc_descripcion||' '||m.texto_adicional;
+        END LOOP;
+
+        SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'Zona 3 vlc_descripcion:'||vlc_descripcion||' conceptos:'||SELF.conceptos.COUNT);
+
+
+        FOR j IN SELF.conceptos.FIRST .. SELF.conceptos.LAST
+        LOOP
+            SELF.conceptos(j).descripcion := vlc_descripcion;
+
+            SELF.REGISTRAR_DEBUG('ajusta_conceptos', SELF.conceptos(j).imprimir_linea);
+        END LOOP; 
+
+        SELF.estatus_debug := 'I';
+        
+    END ajusta_conceptos;
+
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2) IS
+    BEGIN
+        IF estatus_debug IN ('A','D') THEN
+			P_BAN_DEBUG(raiz_debug||pic_procedimiento,pic_texto);
+		END IF;
+		
+		IF estatus_debug IN ('A','O') THEN
+			DBMS_OUTPUT.PUT_LINE(pic_procedimiento||' -> '||pic_texto);
+		END IF;
+	EXCEPTION
+		WHEN OTHERS THEN
+			NULL;
+    END REGISTRAR_DEBUG;
 END;
 
 -------------

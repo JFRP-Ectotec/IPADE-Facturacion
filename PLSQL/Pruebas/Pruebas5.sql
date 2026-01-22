@@ -54,14 +54,36 @@ WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084989')
 
 COMMIT;
 
+SELECT tzrpofi_docnum_pos
+FROM tzrpofi
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085008')
+;
+
+SELECT tbraccd_pidm, tbraccd_tran_number, 
+	tbraccd_detail_code, tbraccd_amount,
+	tbraccd_tran_number_paid
+FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085008')
+	--AND tbraccd_tran_number = 4
+;
+
+SELECT LISTAGG(tbracdt_text, ' ') WITHIN GROUP(ORDER BY tbracdt_seq_number)
+FROM tbracdt
+WHERE tbracdt_pidm = gb_common.f_get_pidm('A00085008')
+	--AND tbracdt_tran_number = 10
+;
+
+SELECT *
+FROM 
+
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084990';
-	tran_number NUMBER := 15;
+	matricula VARCHAR2(20 CHAR) := 'A00085008';
+	tran_number NUMBER := 8;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PPD');
+	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PPD', 'FAC', 4);
 	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
@@ -77,12 +99,12 @@ END;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084985';
+	matricula VARCHAR2(20 CHAR) := 'A00085008';
 	tran_number NUMBER := 3;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
+	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PUE');
 	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN

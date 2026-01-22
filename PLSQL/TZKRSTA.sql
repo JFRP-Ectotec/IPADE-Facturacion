@@ -128,8 +128,17 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
                     AND tvrtsta_tran_number = tran_number
                     AND tvrtsta_tsta_code = registros(i).codigo;
             ELSE
-                reg_agregar.EXTEND;
-                reg_agregar(reg_agregar.COUNT) := registros(i);
+                SELECT COUNT(*)
+                INTO vln_contador
+                FROM tvvtsta
+                WHERE tvvtsta_code = registros(i).codigo;
+
+                IF (vln_contador > 0) THEN
+                    reg_agregar.EXTEND;
+                    reg_agregar(reg_agregar.COUNT) := registros(i);
+                ELSE
+                    pr_registrar_debug('fn_insertar_tvrtsta','codigo:'||registros(i).codigo||' no existe en TVVTSTA');
+                END IF;  
             END IF;
         END LOOP; 
 
@@ -200,6 +209,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
         vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, 'T'); 
         codigo := 'T'||vlc_seqCodigo;
+        pr_registrar_debug('fn_registrar',codigo||' - '||numFactura);
         pr_registrar_tvsta(codigo, tipo_transaccion, numFactura, registros);
 
         RETURN 'OP_EXITOSA';
@@ -265,6 +275,10 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         vlc_valor tvrtsta.tvrtsta_comments%TYPE;
 
     BEGIN
+        IF (NVL(receptor.numGrupo, 0) < 1) THEN
+            RETURN 'OP_EXITOSA';
+        END IF;
+
         numGrupo := receptor.numGrupo;
         vlc_codigo := 'FC'||numGrupo;
         vlc_valor := receptor.rfc;
@@ -339,7 +353,9 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
     BEGIN
         registros := TY_TRALIX_TSTA_ARR();
 
+        pr_registrar_debug('fn_registrar',datos_factura.info_gral_comprobante.imprimir_linea);
         vlc_valor := datos_factura.info_gral_comprobante.cfdi;
+        pr_registrar_debug('fn_registrar',vlc_valor || ' - ' || datos_factura.info_gral_comprobante.cfdi||' - '||tipo_factura);
         IF (tipo_factura = 'FP') THEN
             vlc_valor := datos_compPago.info_gral_comprobante.cfdi;
         END IF;

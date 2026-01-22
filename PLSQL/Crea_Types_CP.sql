@@ -141,6 +141,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
         tranOriginal NUMBER
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
+        totImpuestos NUMBER;
+        monto tbraccd.tbraccd_amount%TYPE;
+        recibo tbraccd.tbraccd_receipt_number%TYPE;
     BEGIN
         SELECT self INTO parent FROM dual;
         parent.INIT('compTotales');
@@ -157,36 +160,35 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
         SELF.totTrasladosImpIVA0 := NULL;
         SELF.totTrasladosBaseIVAEx := NULL;
 
-        FOR i IN (
-            SELECT tbrappl_amount
-            FROM tbrappl
-            WHERE tbrappl_pidm = pidm
-                AND tbrappl_pay_tran_number = tranNumberCP
-                AND tbrappl_chg_tran_number = tranOriginal
-        ) LOOP
-            SELF.totTrasladosBaseIVA16 := i.tbrappl_amount;
-            SELF.totTrasladosImpIVA16 := i.tbrappl_amount * 0.16;
-        END LOOP;
+        /* Obtener monto de la transacción Banner */
+        SELECT tbraccd_amount, tbraccd_receipt_number
+        INTO monto, recibo
+        FROM tbraccd
+        WHERE tbraccd_pidm = pidm
+            AND tbraccd_tran_number = tranNumber
+        ;
+
+        /* Ver si hay impuestos */
+        SELECT NVL(SUM(tbraccd_amount), 0)
+        INTO totImpuestos
+        FROM tbraccd t
+        WHERE tbraccd_pidm = pidm
+            AND tbraccd_tran_number != tranNumber
+            AND tbraccd_receipt_number = recibo
+            AND tbraccd_srce_code = 'Z'
+        ;
+
+        IF (totImpuestos > 0) THEN
+            SELF.totTrasladosBaseIVA16 := monto;
+            SELF.totTrasladosImpIVA16 := totImpuestos;
+        END IF;
 
         -- SELF.estatus_debug := 'A';
         -- SELF.registrar_debug('TY_TRALIX_LINEA_COMPTOT', 'pidm: '||pidm||
         --     ' tranNumber:'||tranNumberCP||' tranNumberOrig:'||tranOriginal);
         
-
         IF (NVL(SELF.totTrasladosBaseIVA16, 0) <= 0) THEN
-            FOR j IN (
-                SELECT tbraccd_amount
-                FROM tbraccd
-                WHERE tbraccd_pidm = pidm
-                    AND tbraccd_tran_number = tranNumberCP
-                    AND tbraccd_tran_number_paid = tranOriginal
-            ) LOOP
-
-                SELF.totTrasladosBaseIVA16 := j.tbraccd_amount;
-                SELF.totTrasladosImpIVA16 := j.tbraccd_amount * 0.16;
-
-                -- SELF.registrar_debug('TY_TRALIX_LINEA_COMPTOT', 'totTraslados: '||SELF.totTrasladosBaseIVA16);
-            END LOOP;
+            SELF.totTrasladosBaseIVAEx := monto;
         END IF;
 
         SELF.montoTotalPagos := NVL(SELF.totTrasladosBaseIVA16, 0)
@@ -299,24 +301,26 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
             SELF.impSaldoAnt := j.tbraccd_amount;
         END LOOP;
 
-        SELF.numParcialidad := 1;
-        FOR m IN (
-            -- SELECT NVL(SUM(tbrappl_amount), 0) as saldoPagado,
-            --     COUNT(*) as numParcialidades
-            -- FROM tbrappl
-            -- WHERE tbrappl_pidm = pidm
-            --     AND tbrappl_chg_tran_number = tranOriginal
-            --     AND tbrappl_pay_tran_number < tranNumberCP
-            SELECT NVL(SUM(tbraccd_amount), 0) as saldoPagado,
-                COUNT(*) as numParcialidades
-            FROM tbraccd
-            WHERE tbraccd_pidm = pidm
-                AND tbraccd_tran_number < tranNumberCP
-                AND tbraccd_tran_number_paid = tranOriginal
-        ) LOOP
-            SELF.impSaldoAnt := SELF.impSaldoAnt - m.saldoPagado;
-            SELF.numParcialidad := m.numParcialidades + 1;
-        END LOOP;
+        SELECT COUNT(*) + 1
+        INTO SELF.numParcialidad
+        FROM tvrtsta
+        WHERE tvrtsta_pidm = pidm
+            AND tvrtsta_tran_number = tranOriginal
+            AND REGEXP_LIKE (tvrtsta_tsta_code, 'UI\d')
+        ;
+
+        -- SELF.numParcialidad := 1;
+        -- FOR m IN (
+        --     SELECT NVL(SUM(tbraccd_amount), 0) as saldoPagado,
+        --         COUNT(*) as numParcialidades
+        --     FROM tbraccd
+        --     WHERE tbraccd_pidm = pidm
+        --         AND tbraccd_tran_number < tranNumberCP
+        --         AND tbraccd_tran_number_paid = tranOriginal
+        -- ) LOOP
+        --     SELF.impSaldoAnt := SELF.impSaldoAnt - m.saldoPagado;
+        --     SELF.numParcialidad := m.numParcialidades + 1;
+        -- END LOOP;
 
         SELF.impSaldoInsoluto := SELF.impSaldoAnt - SELF.impPagado;
 
@@ -383,7 +387,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_IMP_CP UNDER TY_TRALIX_LINEA
         tipoFactura VARCHAR2, -- DR (original) o P (complemento)
         pidm NUMBER,
         idPagos VARCHAR2,
-        monto NUMBER
+        monto NUMBER,
+        impuesto NUMBER
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
     MEMBER PROCEDURE validar */
@@ -394,7 +399,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
         tipoFactura VARCHAR2,
         pidm NUMBER,
         idPagos VARCHAR2,
-        monto NUMBER
+        monto NUMBER,
+        impuesto NUMBER
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
     BEGIN
@@ -410,6 +416,12 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
         SELF.tipoFactorDR := 'Tasa';
         SELF.tasaCuotaDR := 0.16;
         SELF.importeDR := SELF.baseDR * SELF.tasaCuotaDR;
+
+        IF (NVL(impuesto, 0) <= 0) THEN
+            SELF.tipoFactorDR := 'Exento';
+            SELF.tasaCuotaDR := NULL;
+            SELF.importeDR := NULL;
+        END IF;
 
         RETURN;
     END TY_TRALIX_LINEA_IMP_CP;
@@ -587,7 +599,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
 
         SELF.impuestos_DR := TY_TRALIX_ARR_IMP_CP();
         SELF.impuestos_DR.EXTEND;
-        SELF.impuestos_DR(SELF.impuestos_DR.COUNT) := TY_TRALIX_LINEA_IMP_CP('DR', vln_pidm, idPagos, SELF.doctorel.impSaldoAnt);
+        SELF.impuestos_DR(SELF.impuestos_DR.COUNT) := TY_TRALIX_LINEA_IMP_CP('DR', vln_pidm, idPagos, SELF.compTotales.montoTotalPagos);
 
         SELF.impuestos_P := TY_TRALIX_ARR_IMP_CP();
         SELF.impuestos_P.EXTEND;
