@@ -85,18 +85,24 @@ END;
 
 SELECT *
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084673')
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084990')
 ;
+
+PBA - 7798
+
+A00085005 - 24
+
+
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084989';
-	tran_number NUMBER := 7;
+	matricula VARCHAR2(20 CHAR) := 'A00084990';
+	tran_number NUMBER := 16;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '01');
-	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
+	vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '04');
+	--vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
 	IF (vlt_respuesta.errores.COUNT > 0) THEN

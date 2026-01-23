@@ -165,37 +165,26 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
         INTO monto, recibo
         FROM tbraccd
         WHERE tbraccd_pidm = pidm
-            AND tbraccd_tran_number = tranNumber
+            AND tbraccd_tran_number = tranNumberCP
         ;
 
         /* Ver si hay impuestos */
-        SELECT NVL(SUM(tbraccd_amount), 0)
-        INTO totImpuestos
-        FROM tbraccd t
-        WHERE tbraccd_pidm = pidm
-            AND tbraccd_tran_number != tranNumber
-            AND tbraccd_receipt_number = recibo
-            AND tbraccd_srce_code = 'Z'
-        ;
+        -- SELECT NVL(SUM(tbraccd_amount), 0)
+        -- INTO totImpuestos
+        -- FROM tbraccd t
+        -- WHERE tbraccd_pidm = pidm
+        --     AND tbraccd_tran_number != tranNumberCP
+        --     AND tbraccd_receipt_number = recibo
+        --     AND tbraccd_srce_code = 'Z'
+        -- ;
 
-        IF (totImpuestos > 0) THEN
-            SELF.totTrasladosBaseIVA16 := monto;
-            SELF.totTrasladosImpIVA16 := totImpuestos;
-        END IF;
+        SELF.montoTotalPagos := monto;
+        -- SELF.totTrasladosBaseIVA16 := monto / 1.16;
+        -- SELF.totTrasladosImpIVA16 := monto - SELF.totTrasladosBaseIVA16;
 
-        -- SELF.estatus_debug := 'A';
-        -- SELF.registrar_debug('TY_TRALIX_LINEA_COMPTOT', 'pidm: '||pidm||
-        --     ' tranNumber:'||tranNumberCP||' tranNumberOrig:'||tranOriginal);
-        
         IF (NVL(SELF.totTrasladosBaseIVA16, 0) <= 0) THEN
             SELF.totTrasladosBaseIVAEx := monto;
         END IF;
-
-        SELF.montoTotalPagos := NVL(SELF.totTrasladosBaseIVA16, 0)
-            + NVL(SELF.totTrasladosBaseIVA8, 0)
-            + NVL(SELF.totTrasladosBaseIVA0, 0)
-            + NVL(SELF.totTrasladosBaseIVAEx, 0)
-        ;
 
         -- SELF.registrar_debug('TY_TRALIX_LINEA_COMPTOT', 'totalPagos: '||SELF.montoTotalPagos);
         -- SELF.estatus_debug := 'I';
@@ -387,8 +376,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_IMP_CP UNDER TY_TRALIX_LINEA
         tipoFactura VARCHAR2, -- DR (original) o P (complemento)
         pidm NUMBER,
         idPagos VARCHAR2,
-        monto NUMBER,
-        impuesto NUMBER
+        compTotales TY_TRALIX_LINEA_COMPTOT
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
     MEMBER PROCEDURE validar */
@@ -399,8 +387,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
         tipoFactura VARCHAR2,
         pidm NUMBER,
         idPagos VARCHAR2,
-        monto NUMBER,
-        impuesto NUMBER
+        compTotales TY_TRALIX_LINEA_COMPTOT
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
     BEGIN
@@ -411,15 +398,19 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
         SELF.sep := parent.sep;
 
         SELF.idPagos := idPagos;
-        SELF.baseDR := monto;
+        -- SELF.baseDR := monto;
         SELF.impuestoDR := '002';
-        SELF.tipoFactorDR := 'Tasa';
-        SELF.tasaCuotaDR := 0.16;
-        SELF.importeDR := SELF.baseDR * SELF.tasaCuotaDR;
+        -- SELF.importeDR := SELF.baseDR * SELF.tasaCuotaDR;
 
-        IF (NVL(impuesto, 0) <= 0) THEN
+        IF (NVL(compTotales.totTrasladosBaseIVAEx, -1) < 0) THEN
+            SELF.tipoFactorDR := 'Tasa';
+            SELF.tasaCuotaDR := 0.16;
+            SELF.baseDR := compTotales.totTrasladosBaseIVA16;
+            SELF.importeDR := compTotales.totTrasladosImpIVA16;
+        ELSE
             SELF.tipoFactorDR := 'Exento';
             SELF.tasaCuotaDR := NULL;
+            SELF.baseDR := compTotales.totTrasladosBaseIVAEx;
             SELF.importeDR := NULL;
         END IF;
 
@@ -542,8 +533,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         numLineas := numLineas + 1;
 
         SELF.estatus_debug := 'A';
-        REGISTRAR_DEBUG('TY_TRALIX_COMPPAGO', SELF.info_gral_comprobante.imprimir_linea);
-        SELF.estatus_debug := 'I';
+        SELF.REGISTRAR_DEBUG('TY_TRALIX_COMPPAGO', SELF.info_gral_comprobante.imprimir_linea);
+        -- SELF.estatus_debug := 'I';
 
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
 
@@ -554,6 +545,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
 
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
         numLineas := numLineas + 1;
+
+        -- SELF.estatus_debug := 'A';
+        SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'formaPago: '||formaPago);
+        --     ' tranNumber:'||tranNumberCP||' tranNumberOrig:'||tranOriginal);
+        SELF.estatus_debug := 'I';
 
         SELF.compPagos := TY_TRALIX_LINEA_COMPPAGOS(vln_pidm, tranNumber, tranOriginal, idPagos, formaPago);
         numLineas := numLineas + 1;
@@ -599,11 +595,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
 
         SELF.impuestos_DR := TY_TRALIX_ARR_IMP_CP();
         SELF.impuestos_DR.EXTEND;
-        SELF.impuestos_DR(SELF.impuestos_DR.COUNT) := TY_TRALIX_LINEA_IMP_CP('DR', vln_pidm, idPagos, SELF.compTotales.montoTotalPagos);
+        SELF.impuestos_DR(SELF.impuestos_DR.COUNT) := TY_TRALIX_LINEA_IMP_CP('DR', vln_pidm, idPagos, SELF.compTotales);
 
         SELF.impuestos_P := TY_TRALIX_ARR_IMP_CP();
         SELF.impuestos_P.EXTEND;
-        SELF.impuestos_P(SELF.impuestos_P.COUNT) := TY_TRALIX_LINEA_IMP_CP('P', vln_pidm, idPagos, SELF.compTotales.montoTotalPagos);
+        SELF.impuestos_P(SELF.impuestos_P.COUNT) := TY_TRALIX_LINEA_IMP_CP('P', vln_pidm, idPagos, SELF.compTotales);
 
         SELF.errores := TY_TRALIX_ARR_ERROR();
 
@@ -787,3 +783,4 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         -- END IF;
     END validar;
 END;
+

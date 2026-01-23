@@ -292,7 +292,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
             SELF.format_fecha(SELF.fecha) || SELF.sep ||
             SELF.format_moneda(SELF.subTotalNum) || SELF.sep ||
             SELF.format_moneda(SELF.totalNum) || SELF.sep ||
-            SELF.format_moneda(SELF.taxesTrasladados) || SELF.sep ||
+            --SELF.format_moneda(SELF.taxesTrasladados) || SELF.sep ||
+            TRIM(TO_CHAR(SELF.taxesTrasladados, '9999999990.00')) || SELF.sep ||
             SELF.format_moneda(SELF.taxesRetenidos) || SELF.sep ||
             SELF.format_moneda(SELF.descuento) || SELF.sep ||
             SELF.motivoDescuento || SELF.sep ||
@@ -1376,7 +1377,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
         metodoPago VARCHAR2,
         procesoFactura VARCHAR2,
         tranOriginalAntic NUMBER,
-        tranFantImpuestos NUMBER
+        tranFantImpuestos NUMBER,
+        adicional VARCHAR2
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
     MEMBER PROCEDURE ajustar_pubgral,
@@ -1386,7 +1388,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
     MEMBER PROCEDURE impuestos_anticipada(pidm NUMBER, tranNumber NUMBER,
         tranImpuestos NUMBER,
         totalCargos OUT NUMBER, impTrasladados OUT NUMBER),
-    MEMBER PROCEDURE ajusta_conceptos(pidm NUMBER, tranOriginal NUMBER),
+    MEMBER PROCEDURE ajusta_conceptos(pidm NUMBER, tranOriginal NUMBER, adicional VARCHAR2),
     MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2)
 ) NOT FINAL INSTANTIABLE
 ;
@@ -1401,7 +1403,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         metodoPago VARCHAR2,
         procesoFactura VARCHAR2,
         tranOriginalAntic NUMBER,
-        tranFantImpuestos NUMBER
+        tranFantImpuestos NUMBER,
+        adicional VARCHAR2
     ) RETURN SELF AS RESULT IS
         concepto TY_TRALIX_LINEA_05;
         -- impuestoTras TY_TRALIX_LINEA_06;
@@ -1461,7 +1464,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         IF (procesoFactura = 'ANT') THEN
             impuestos_anticipada(vln_pidm, tranNumber, tranFantImpuestos,
                 totalCargos, impTrasladados);
-            ajusta_conceptos(vln_pidm, tranOriginalAntic);
+            ajusta_conceptos(vln_pidm, tranOriginalAntic, adicional);
         ELSE
             impuestos_default(vln_pidm, tranNumber, totalCargos, impTrasladados);
         END IF;
@@ -1826,7 +1829,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.concImpTras(SELF.concImpTras.COUNT) := concImpTrasRow;
     END impuestos_anticipada;
 
-    MEMBER PROCEDURE ajusta_conceptos(pidm NUMBER, tranOriginal NUMBER) IS
+    MEMBER PROCEDURE ajusta_conceptos(pidm NUMBER, tranOriginal NUMBER,
+        adicional VARCHAR2) IS
         vlc_codigo_detalle  TBRACCD.TBRACCD_DETAIL_CODE%TYPE;
         vlc_descripcion VARCHAR2(100 CHAR);
         vln_contador NUMBER;
@@ -1875,17 +1879,20 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
         SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'Zona 2 vlc_descripcion:'||vlc_descripcion);
 
+        IF (LENGTH(NVL(adicional, ''))) > 0 THEN
+            vlc_descripcion := vlc_descripcion||' '||adicional;
+        END IF;
 
-        FOR m IN (
-            SELECT LISTAGG(tbracdt_text, ' ') WITHIN GROUP(ORDER BY tbracdt_seq_number) as texto_adicional
-            FROM tbracdt
-            WHERE tbracdt_pidm = pidm
-                and tbracdt_tran_number = tranOriginal
-        ) LOOP
-            SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'Zona 2.1 vlc_descripcion:'||vlc_descripcion||' adicional:'||m.texto_adicional);
+        -- FOR m IN (
+        --     SELECT LISTAGG(tbracdt_text, ' ') WITHIN GROUP(ORDER BY tbracdt_seq_number) as texto_adicional
+        --     FROM tbracdt
+        --     WHERE tbracdt_pidm = pidm
+        --         and tbracdt_tran_number = tranOriginal
+        -- ) LOOP
+        --     SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'Zona 2.1 vlc_descripcion:'||vlc_descripcion||' adicional:'||m.texto_adicional);
 
-            vlc_descripcion := vlc_descripcion||' '||m.texto_adicional;
-        END LOOP;
+        --     vlc_descripcion := vlc_descripcion||' '||m.texto_adicional;
+        -- END LOOP;
 
         SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'Zona 3 vlc_descripcion:'||vlc_descripcion||' conceptos:'||SELF.conceptos.COUNT);
 

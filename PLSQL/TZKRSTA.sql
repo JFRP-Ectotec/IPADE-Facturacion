@@ -353,12 +353,14 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
     BEGIN
         registros := TY_TRALIX_TSTA_ARR();
 
-        pr_registrar_debug('fn_registrar',datos_factura.info_gral_comprobante.imprimir_linea);
-        vlc_valor := datos_factura.info_gral_comprobante.cfdi;
-        pr_registrar_debug('fn_registrar',vlc_valor || ' - ' || datos_factura.info_gral_comprobante.cfdi||' - '||tipo_factura);
-        IF (tipo_factura = 'FP') THEN
+        pr_registrar_debug('fn_registrar','tipo_factura:'||tipo_factura);
+
+        IF (tipo_factura != 'FP') THEN
+            vlc_valor := datos_factura.info_gral_comprobante.cfdi;
+        ELSE
             vlc_valor := datos_compPago.info_gral_comprobante.cfdi;
         END IF;
+        pr_registrar_debug('fn_registrar',vlc_valor || ' - ' || vlc_valor||' - '||tipo_factura);
 
         vlc_respCall := fn_registrar_tipo_factura(pidm, tran_number, tipo_factura, 
             vlc_valor, registros);
@@ -371,22 +373,30 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         -- pr_registrar_debug('fn_registrar','F'||vlc_seqCodigo);
         vlc_codigo := 'F'||vlc_seqCodigo;
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
-        vlc_dloc := datos_factura.info_gral_comprobante.metodoPago;
-        IF (tipo_factura = 'FP') THEN
+
+        IF (tipo_factura != 'FP') THEN
+            vlc_dloc := datos_factura.info_gral_comprobante.metodoPago;
+        ELSE
             vlc_dloc := 'PUE';
         END IF;
         pr_registrar_tvsta(vlc_codigo, vlc_dloc, vlc_valor, registros);
 
         -- pr_registrar_tvsta('SOC', '', datos_factura.sociedad, registros);
         vlc_codigo := 'SOC';
-        vlc_valor := 'IPADE'||datos_factura.receptor.numEntidad;  
+
+        IF (tipo_factura != 'FP') THEN
+            vlc_valor := 'IPADE'||datos_factura.receptor.numEntidad;  
+        ELSE
+            vlc_valor := 'IPADE'||datos_compPago.receptor.numEntidad;  
+        END IF;
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
 
         vlc_seqCodigo := SUBSTR(vlc_seqCodigo, 2, 1);
         vlc_codigo := 'FV'||vlc_seqCodigo;        
-        vlc_valor := TO_CHAR(datos_factura.info_gral_comprobante.fecha, 'DD-MON-YYYY');
-        IF (tipo_factura = 'FP') THEN
+        IF (tipo_factura != 'FP') THEN
+            vlc_valor := TO_CHAR(datos_factura.info_gral_comprobante.fecha, 'DD-MON-YYYY');
+        ELSE
             vlc_valor := TO_CHAR(datos_compPago.info_gral_comprobante.fecha, 'DD-MON-YYYY');
         END IF;
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
@@ -406,8 +416,9 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         
         -- pr_registrar_tvsta('FP'||vlc_seqCodigo, '', datos_factura.formaPago, registros);
         vlc_codigo := 'FP'||vlc_seqCodigo;
-        vlc_valor := datos_factura.info_gral_comprobante.metodoPago;
-        IF (tipo_factura = 'FP') THEN
+        IF (tipo_factura != 'FP') THEN
+            vlc_valor := datos_factura.info_gral_comprobante.metodoPago;
+        ELSE
             vlc_valor := 'PUE';
         END IF;
 
@@ -415,8 +426,9 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
         -- vln_secuencial := vln_secuencial + 1;
         
-        receptor := datos_factura.receptor;
-        IF (tipo_factura = 'FP') THEN
+        IF (tipo_factura != 'FP') THEN
+            receptor := datos_factura.receptor;
+        ELSE
             receptor := datos_comppago.receptor;
         END IF;
         vlc_respCall := fn_registrar_datos_fiscales(
