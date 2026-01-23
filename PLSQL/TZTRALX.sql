@@ -57,7 +57,8 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE',  /* Valores válidos 'PUE', 'PPD' */
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
-        tran_number_original IN NUMBER DEFAULT 0)
+        tran_number_original IN NUMBER DEFAULT 0,
+        tran_number_imp IN NUMBER DEFAULT 0)
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
     FUNCTION fn_factura_cp_tralix(
@@ -495,7 +496,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlb_respuesta BOOLEAN := FALSE;
     BEGIN
         IF ((INSTR(bufferMensaje, 'La clave del campo RegimenFiscalR no corresponde de acuerdo al RFC del receptor') > 0) OR
-            (INSTR(bufferMensaje, 'La clave del campo RegimenFiscalR debe corresponder con el tipo de persona (física o moral)') > 0)) THEN
+            (INSTR(bufferMensaje, 'La clave del campo RegimenFiscalR debe corresponder con el tipo de persona (física o moral)') > 0) OR
+            (INSTR(bufferMensaje, 'RFC del receptor no existe en la lista de RFC inscritos no cancelados del SAT') > 0)
+            ) THEN
             vlb_respuesta := TRUE;
         END IF;
 
@@ -509,7 +512,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE', 
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
         proceso_factura IN VARCHAR2 DEFAULT 'DEF',
-        tran_number_orig_ant IN NUMBER DEFAULT 0)   -- DEF = Default, ANT = Anticipada, CP = Complemento de Pago
+        tran_number_orig_ant IN NUMBER DEFAULT 0,
+        tran_number_imp IN NUMBER DEFAULT 0)   -- DEF = Default, ANT = Anticipada, CP = Complemento de Pago
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlc_respuesta CLOB;
         ipade_pidm NUMBER;
@@ -552,7 +556,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
     BEGIN
         pr_registrar_debug('fn_factura_base', 'matricula:'||matricula||' tran_number:'||tran_number||' tipo_pago_banner:'||
             tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar||' proceso_factura:'||proceso_factura
-            ||' tran_number_orig_ant:'||tran_number_orig_ant);
+            ||' tran_number_orig_ant:'||tran_number_orig_ant||' tran_number_imp:'||tran_number_imp);
 
         BEGIN
             vln_pidm := gb_common.f_get_pidm(matricula);
@@ -624,8 +628,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             RETURN vlt_respuesta;
         END IF;
 
-        pr_registrar_debug('fn_factura_base', 'Zona1');
-
         vlc_tipo_pago_banner := tipo_pago_banner;
         IF (tipo_pago_facturar = 'PPD') THEN
             vlc_tipo_pago_banner := '99';
@@ -658,9 +660,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             END LOOP;
         END IF;
 
-        pr_registrar_debug('fn_factura_base', 'Zona2');
-
-
         FOR j IN (
             SELECT TVRSDSQ_MAX_SEQ + 1 as secuencial
             FROM TVRSDSQ t
@@ -690,7 +689,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
             datosFactura := ty_tralix_factura(matricula, tran_number, vlc_num_entidad, 
                 1, vlc_tipo_pago_banner, tipo_pago_facturar, proceso_factura,
-                tran_number_orig_ant);       
+                tran_number_orig_ant, tran_number_imp);       
 
             datosFactura.validar;
             IF (datosFactura.errores.COUNT > 0) THEN
@@ -708,7 +707,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             END IF;
 
             pr_registrar_debug('fn_factura_base', 'datosFactura.receptor.numGrupo: '||datosFactura.receptor.numGrupo);
-            IF (NVL(datosFactura.receptor.numGrupo, 0) NOT IN (1, 2)) THEN
+            IF (NVL(datosFactura.receptor.numGrupo, 0) NOT IN (1, 2, 3, 4, 5)) THEN
                 pubgral := TRUE;
             END IF;
         
@@ -792,13 +791,10 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlt_respuesta.mainData := vlc_objeto_principal;
 
         pr_registrar_debug('fn_factura_base_tralix', 'payload:' || vlc_objeto_principal);
-
-        -- vlt_respuesta.estatus := 'ERROR';
-        -- vlt_respuesta.agregar_error('No implementado aún.');
         
-        IF (vlt_respuesta.estatus = 'ERROR') THEN
-            RETURN vlt_respuesta;
-        END IF;
+        -- IF (vlt_respuesta.estatus = 'ERROR') THEN
+        --     RETURN vlt_respuesta;
+        -- END IF;
 
         vlc_envioTralix := envio_factura_tralix(vlc_objeto_principal, vlb_estatusEnvio);
         vln_monto := 0;
@@ -813,7 +809,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             /* TODO: Si aqui hay un error de  "La clave del campo RegimenFiscalR no corresponde de acuerdo al RFC del receptor" 
             y es primera vez volver a enviar pero indicando que es segunda vez y como si fuera a PubGral. */
 
-            pr_registrar_debug('fn_factura_base_tralix', 'CON ERROR: ' || bufferMensaje);
+            pr_registrar_debug('fn_factura_base_tralix', 'CON ERROR: ' || bufferMensaje || ' proceso_factura:' || proceso_factura);
 
             IF (NOT(pubgral) AND fn_reenviar(bufferMensaje)) THEN
                 IF (proceso_factura != 'CP') THEN
@@ -901,6 +897,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     TZRPOFI_DCAT_CODE, TZRPOFI_IAC_CDE, TZRPOFI_INCL_BARCODE_IND, TZRPOFI_INCL_PI_IND, 
                     TZRPOFI_PI_IND, TZRPOFI_INCL_DOCNUM_IND, TZRPOFI_DOCNUM_POS, TZRPOFI_EXP_PDF_LBL_1,
                     TZRPOFI_INCL_SCHG_LABEL, TZRPOFI_DATE_CHG_1, TZRPOFI_DETC_CODE_CHG_1, 
+                    TZRPOFI_OVRD_FEE_1, TZRPOFI_PO_AMT_1,
                     TZRPOFI_DATA_ORIGIN, TZRPOFI_CREATE_USER_ID, TZRPOFI_CREATE_DATE, 
                     TZRPOFI_USER_ID, TZRPOFI_ACTIVITY_DATE
                 ) VALUES (
@@ -908,6 +905,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     'CSH', uuidTralix, 'N', 'N', 
                     'N', 'N', tran_number, fn_obtener_idEmpresa(vlc_num_entidad),
                     'N', SYSDATE, 'X', 
+                    tran_number_orig_ant, tran_number_imp,
                     'Tralix', USER, SYSDATE, 
                     USER, SYSDATE
                 );
@@ -969,7 +967,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar);
 
         RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
-            tipo_pago_facturar, etiqueta, 'DEF', 0);
+            tipo_pago_facturar, etiqueta, 'DEF', 0, 0);
     END fn_factura_tralix;
 
     FUNCTION fn_factura_tralix_json(
@@ -1329,15 +1327,16 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE', 
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
-        tran_number_original IN NUMBER DEFAULT 0)
+        tran_number_original IN NUMBER DEFAULT 0,
+        tran_number_imp IN NUMBER DEFAULT 0)
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
     BEGIN
         pr_registrar_debug('fn_factura_ant_tralix', 'matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar
-            ||' tran_number_original:'||tran_number_original);
+            ||' tran_number_original:'||tran_number_original||' tran_number_imp:'||tran_number_imp);
 
         RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
-            tipo_pago_facturar, etiqueta, 'ANT', tran_number_original);
+            tipo_pago_facturar, etiqueta, 'ANT', tran_number_original, tran_number_imp);
     END fn_factura_ant_tralix;
 
     FUNCTION fn_factura_cp_tralix(
@@ -1352,7 +1351,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             ||' tipo_pago_banner:'||tipo_pago_banner||' etiqueta:'||etiqueta);
 
         RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
-            'PPD', etiqueta, 'CP', 0);
+            'PPD', etiqueta, 'CP', 0, 0);
     END fn_factura_cp_tralix;
 
     FUNCTION existe_factura(

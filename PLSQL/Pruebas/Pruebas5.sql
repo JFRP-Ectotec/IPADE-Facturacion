@@ -73,18 +73,88 @@ WHERE tbracdt_pidm = gb_common.f_get_pidm('A00085008')
 	--AND tbracdt_tran_number = 10
 ;
 
+select * from tbraccd where tbraccd_pidm=105063  AND TBRACCD_TRAN_NUMBER IN (41,40,39,12) order by 2 desc;
+
+select * from spriden where spriden_pidm = 105063;
+
 SELECT *
-FROM 
+FROM tbraccd
+WHERE tbraccd_pidm = 105077
+;
+
+SELECT *
+FROM spriden
+WHERE spriden_pidm = 105077
+;
+
+SELECT *
+FROM tbracdt
+WHERE tbracdt_pidm = gb_common.f_get_pidm('A00085004')
+;
+
+SELECT LISTAGG(tbracdt_text, ' ') WITHIN GROUP(ORDER BY tbracdt_seq_number) as texto_adicional
+            FROM tbracdt
+            WHERE tbracdt_pidm = 105077
+                and tbracdt_tran_number = 8
+;
+
+select *
+from gurdbug
+where gurdbug_parm LIKE '%ajusta%'
+	AND gurdbug_value LIKE '%2.1%'
+order by gurdbug_date desc
+;
+
+SELECT *
+FROM spriden
+WHERE spriden_pidm = 105077
+;
+
+SELECT *
+FROM goradid
+WHERE goradid_pidm = gb_common.f_get_pidm('A00085005')
+	AND goradid_adid_code LIKE '%RFC%'
+;
+
+UPDATE goradid
+SET goradid_additional_id = '*XEXX010101000'
+WHERE goradid_pidm = gb_common.f_get_pidm('A00085005')
+	AND goradid_adid_code = '3RFC'
+;
+
+UPDATE goradid
+SET goradid_additional_id = 'IPA220921UB9'
+WHERE goradid_pidm = gb_common.f_get_pidm('A00085005')
+	AND goradid_adid_code = '4RFC'
+;
+COMMIT;
+
+
+SELECT *
+FROM spraddr
+WHERE spraddr_pidm = gb_common.f_get_pidm('A00085005')
+;
+
+SELECT *
+FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085005')
+;
+
+matricula:A00085004 tran_number:26 tipo_pago_banner:99 tipo_pago_facturar:PPD proceso_factura:ANT tran_number_orig_ant:8 tran_number_imp:0
+matricula:A00085004 tran_number:26 tipo_pago_banner:28 tipo_pago_facturar:PPD proceso_factura:ANT tran_number_orig_ant:8 tran_number_imp:0
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085008';
-	tran_number NUMBER := 8;
+	matricula VARCHAR2(20 CHAR) := 'A00085004';
+	tran_number NUMBER := 26;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
+	tran_original NUMBER := 8;
+	tran_impuestos NUMBER := 0;
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PPD', 'FAC', 4);
-	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
+	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD', 'FAC', 
+		tran_original, tran_impuestos);
+	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
 	IF (vlt_respuesta.errores.COUNT > 0) THEN
