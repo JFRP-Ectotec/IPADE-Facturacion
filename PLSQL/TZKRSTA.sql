@@ -18,14 +18,20 @@ CREATE OR REPLACE PACKAGE TZKRSTA IS
     FUNCTION fn_sustituir_factura(
         pidm_canc IN NUMBER,
         tran_number_canc IN NUMBER,
-        motivo_sust IN VARCHAR2) 
+        nuevo_guid IN VARCHAR2) 
         RETURN VARCHAR2;  
+
+    FUNCTION fn_registrar_canc_1(
+        pidm IN NUMBER,
+        tran_number IN NUMBER,
+        motivo_canc IN VARCHAR2) 
+        RETURN VARCHAR2;
 END TZKRSTA;
 /
 show errors;
 
 CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
-    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'A'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'I'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
 	cgc_raiz_debug        CONSTANT VARCHAR2(100) := 'TZKRSTA-';
 
     PROCEDURE pr_registrar_debug (
@@ -88,6 +94,13 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
         IF (vln_respuesta > 9) THEN
             vln_respuesta := 9;
+        END IF;
+
+        /* TODO: Verificar que no pase de cierto numero en determinados casos */
+        IF (inicio_codigo IN ('PC')) THEN
+            IF (vln_respuesta > 2) THEN
+                vln_respuesta := 2;
+            END IF;
         END IF;
 
         vlc_respuesta := TRIM(TO_CHAR(vln_respuesta, vlc_formato));
@@ -324,11 +337,69 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar_datos_fiscales',vlc_codigo||' - '||vlc_valor);
 
+        vlc_codigo := 'RFC';
+        vlc_valor := receptor.rfc;
+        pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
+        pr_registrar_debug('fn_registrar_datos_fiscales',vlc_codigo||' - '||vlc_valor);
+
         RETURN 'OP_EXITOSA';
     EXCEPTION
         WHEN OTHERS THEN
             RETURN 'REG_DAT_FISC:'||sqlerrm;
     END fn_registrar_datos_fiscales;
+
+    FUNCTION fn_registrar_canc_1(
+        pidm IN NUMBER,
+        tran_number IN NUMBER,
+        motivo_canc IN VARCHAR2) 
+        RETURN VARCHAR2 IS
+        registros TY_TRALIX_TSTA_ARR;
+        vlc_respCall VARCHAR2(1000 CHAR);
+        vlc_seqCodigo VARCHAR2(2 CHAR);
+        vlc_codigo VARCHAR2(3 CHAR);
+        vlc_valor tvrtsta.tvrtsta_comments%TYPE;
+        vlc_dloc_code TVRTSTA.TVRTSTA_DLOC_CODE%TYPE := '';
+    BEGIN
+        registros := TY_TRALIX_TSTA_ARR();
+        vlc_codigo := 'PC';
+        vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, vlc_codigo);
+        vlc_codigo := vlc_codigo || vlc_seqCodigo;
+
+        FOR i IN (
+            SELECT tvrtsta_comments
+            FROM tvrtsta
+            WHERE tvrtsta_pidm = pidm
+                AND tvrtsta_tran_number = tran_number
+                AND tvrtsta_tsta_code LIKE 'F0%'
+            ORDER BY tvrtsta_tsta_code DESC, 
+                tvrtsta_activity_date DESC
+        ) LOOP
+            vlc_valor := i.tvrtsta_comments;
+            EXIT;
+        END LOOP;
+
+        IF (NVL(vlc_valor, '|') != '|') THEN
+            FOR i IN (
+                SELECT tvvdloc_code
+                FROM tvvdloc
+                WHERE tvvdloc_code = motivo_canc
+            ) LOOP
+                vlc_dloc_code := i.tvvdloc_code;
+            END LOOP;
+
+            pr_registrar_tvsta(vlc_codigo, vlc_dloc_code, vlc_valor, registros);
+
+            vlc_respCall := fn_insertar_tvrtsta(pidm, tran_number, registros);
+            IF (vlc_respCall != 'OP_EXITOSA') THEN
+                RETURN vlc_respCall;
+            END IF;
+        END IF;
+
+        RETURN 'OP_EXITOSA';
+    EXCEPTION
+        WHEN OTHERS THEN
+            RETURN sqlerrm;
+    END fn_registrar_canc_1;
 
     FUNCTION fn_registrar(
         pidm IN NUMBER,
@@ -499,69 +570,75 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         tran_number IN NUMBER,
         motivo_sust IN VARCHAR2) 
         RETURN VARCHAR2 IS
-        vln_secuencial NUMBER;
-        vlc_seqCodigo VARCHAR2(1 CHAR);
+        registros TY_TRALIX_TSTA_ARR;
         vlc_respCall VARCHAR2(1000 CHAR);
+        vlc_seqCodigo VARCHAR2(2 CHAR);
+        vlc_codigo VARCHAR2(3 CHAR);
+        vlc_valor tvrtsta.tvrtsta_comments%TYPE;
+        vlc_dloc_code TVRTSTA.TVRTSTA_DLOC_CODE%TYPE := '';
     BEGIN
-        SELECT NVL(MAX(tvrtsta_seq_no), 0) + 1
-        INTO vln_secuencial
-        FROM tvrtsta
-        WHERE tvrtsta_pidm = pidm
-            AND tvrtsta_tran_number = tran_number
-        ;
+        registros := TY_TRALIX_TSTA_ARR();
+        vlc_codigo := 'CA';
+        vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, vlc_codigo);
+        vlc_codigo := vlc_codigo || vlc_seqCodigo;
+        -- vlc_valor := motivo_sust;
 
-        vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, 'CA');  
+        FOR j IN (
+            SELECT tvrtsta_comments
+            FROM tvrtsta
+            WHERE tvrtsta_pidm = pidm
+                AND tvrtsta_tran_number = tran_number
+                AND tvrtsta_tsta_code LIKE 'PC%'
+            ORDER BY tvrtsta_tsta_code DESC, 
+                tvrtsta_activity_date DESC
+        ) LOOP
+            vlc_valor := j.tvrtsta_comments;
+            EXIT;
+        END LOOP;
 
-        /* TODO: Ajustar a nuevo flujo */
-        -- vlc_respCall := fn_insertar_tvrtsta(
-        --     pidm, tran_number,
-        --     'CA'||vlc_seqCodigo, motivo_sust, 
-        --     vln_secuencial
-        -- );
-        
-        -- IF (vlc_respCall != 'OP_EXITOSA') THEN
-        --     ROLLBACK;
-        --     RETURN vlc_respCall;
-        -- END IF;
-        
+        FOR i IN (
+            SELECT tvvdloc_code
+            FROM tvvdloc
+            WHERE tvvdloc_code = motivo_sust
+        ) LOOP
+            vlc_dloc_code := i.tvvdloc_code;
+        END LOOP;
+
+        pr_registrar_tvsta(vlc_codigo, vlc_dloc_code, vlc_valor, registros);
+
+        vlc_respCall := fn_insertar_tvrtsta(pidm, tran_number, registros);
+        IF (vlc_respCall != 'OP_EXITOSA') THEN
+            RETURN vlc_respCall;
+        END IF;
+
         RETURN 'OP_EXITOSA';
     END fn_cancelar_factura;
 
     FUNCTION fn_sustituir_factura(
         pidm_canc IN NUMBER,
         tran_number_canc IN NUMBER,
-        motivo_sust IN VARCHAR2) 
+        nuevo_guid IN VARCHAR2) 
         RETURN VARCHAR2 IS
-        vln_secuencial NUMBER;
-        vlc_seqCodigo VARCHAR2(1 CHAR);
+        registros TY_TRALIX_TSTA_ARR;
         vlc_respCall VARCHAR2(1000 CHAR);
+        vlc_seqCodigo VARCHAR2(2 CHAR);
+        vlc_codigo VARCHAR2(3 CHAR);
+        vlc_valor tvrtsta.tvrtsta_comments%TYPE;
     BEGIN
-        -- vlc_respCall := fn_cancelar_factura(pidm_canc, tran_number_canc);
-        -- IF (vlc_respCall != 'OP_EXITOSA') THEN
-        --     ROLLBACK;
-        --     RETURN vlc_respCall;
-        -- END IF;
+        registros := TY_TRALIX_TSTA_ARR();
+        vlc_codigo := 'RCL';
+        vlc_valor := nuevo_guid;
 
-        SELECT NVL(MAX(tvrtsta_seq_no), 0) + 1
-        INTO vln_secuencial
-        FROM tvrtsta
-        WHERE tvrtsta_pidm = pidm_canc
-            AND tvrtsta_tran_number = tran_number_canc
-        ;
+        pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
 
-        /* TODO: Ajustar a nuevo flujo */
-        -- vlc_respCall := fn_insertar_tvrtsta(
-        --     pidm_canc, tran_number_canc,
-        --     'RCL', motivo_sust, vln_secuencial
-        -- );
-        
-        -- IF (vlc_respCall != 'OP_EXITOSA') THEN
-        --     ROLLBACK;
-        --     RETURN vlc_respCall;
-        -- END IF;
-        
+        vlc_respCall := fn_insertar_tvrtsta(pidm_canc, tran_number_canc, registros);
+        IF (vlc_respCall != 'OP_EXITOSA') THEN
+            RETURN vlc_respCall;
+        END IF;
+
         RETURN 'OP_EXITOSA';
     END fn_sustituir_factura;
 END TZKRSTA;
 /
 show errors;
+

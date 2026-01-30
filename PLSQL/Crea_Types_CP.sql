@@ -58,6 +58,28 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
         SELF.MonedaP := 'MXN';
         SELF.TipoCambioP := 1;
 
+        FOR k IN (
+            SELECT TBRACCM_CURR_CODE
+            FROM tbraccm
+            WHERE tbraccm_pidm = pidm
+                AND TBRACCM_ORIG_TRAN_NUMBER = tranNumberCP
+        ) LOOP
+            SELF.MonedaP := k.tbraccm_curr_code;
+        END LOOP;
+
+        IF (SELF.MonedaP NOT IN ('MXN', 'XXX')) THEN
+            FOR j IN 
+            (
+                SELECT GURCURR_CONV_RATE_INV
+                FROM gurcurr
+                WHERE gurcurr_curr_code = SELF.MonedaP
+                ORDER BY gurcurr_activity_date DESC
+            ) LOOP
+                SELF.TipoCambioP := j.GURCURR_CONV_RATE_INV;
+                EXIT;
+            END LOOP;
+        END IF;
+
         FOR i IN (
             -- SELECT t1.tbrappl_amount
             -- FROM tbrappl t1
@@ -179,8 +201,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
         -- ;
 
         SELF.montoTotalPagos := monto;
-        -- SELF.totTrasladosBaseIVA16 := monto / 1.16;
-        -- SELF.totTrasladosImpIVA16 := monto - SELF.totTrasladosBaseIVA16;
+        SELF.totTrasladosBaseIVA16 := monto / 1.16;
+        SELF.totTrasladosImpIVA16 := monto - SELF.totTrasladosBaseIVA16;
 
         IF (NVL(SELF.totTrasladosBaseIVA16, 0) <= 0) THEN
             SELF.totTrasladosBaseIVAEx := monto;
@@ -240,7 +262,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_COMPDOCTREL UNDER TY_TRALIX_LINEA
         pidm NUMBER,
         tranNumberCP NUMBER,
         tranOriginal NUMBER,
-        idPagos VARCHAR2
+        idPagos VARCHAR2,
+        monedaCP VARCHAR2
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
     MEMBER PROCEDURE validar */
@@ -251,7 +274,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
         pidm NUMBER,
         tranNumberCP NUMBER,
         tranOriginal NUMBER,
-        idPagos VARCHAR2
+        idPagos VARCHAR2,
+        monedaCP VARCHAR2
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
         saldoPagado NUMBER;
@@ -267,6 +291,45 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
         SELF.idImpuestoDR := idPagos;
         SELF.objetoImpDR := '02';
 
+        /* Determinar moneda del DoctoRel */
+        SELF.monedaDR := 'MXN';
+        FOR k IN (
+            SELECT TBRACCM_CURR_CODE
+            FROM tbraccm
+            WHERE tbraccm_pidm = pidm
+                AND TBRACCM_ORIG_TRAN_NUMBER = tranOriginal
+        ) LOOP
+            SELF.MonedaDR := k.tbraccm_curr_code;
+        END LOOP;
+
+        SELF.equivalenciaDR := 1;
+        FOR m IN (
+            SELECT NVL(TZRPOFI_PO_OVRD_AMT_1, 1) as equivalencia
+            FROM tzrpofi
+            WHERE tzrpofi_pidm = pidm
+                AND tzrpofi_docnum_pos = tranOriginal
+            ORDER BY tzrpofi_activity_date DESC
+        ) LOOP
+            SELF.equivalenciaDR := m.equivalencia;
+        END LOOP;
+
+        /* Determinar equivalencia si son monedas distintas */
+        IF (SELF.monedaDR != monedaCP) THEN
+            FOR j IN (
+                SELECT gurcurr_conv_rate, gurcurr_conv_rate_inv
+                FROM gurcurr
+                WHERE gurcurr_curr_code = monedaCP 
+                ORDER BY gurcurr_activity_date DESC
+            ) LOOP
+                IF (SELF.monedaDR = 'MXN') THEN
+                    SELF.equivalenciaDR := j.gurcurr_conv_rate;
+                ELSE
+                    SELF.equivalenciaDR := j.gurcurr_conv_rate_inv;
+                END IF;
+                EXIT;
+            END LOOP;
+        END IF;
+
         FOR i IN (
             -- SELECT tbrappl_amount
             -- FROM tbrappl
@@ -278,7 +341,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
             WHERE tbraccd_pidm = pidm
                 AND tbraccd_tran_number = tranNumberCP
         ) LOOP
-            SELF.impPagado := i.tbraccd_amount;
+            SELF.impPagado := i.tbraccd_amount * SELF.equivalenciaDR;
         END LOOP;
 
         FOR j IN (
@@ -326,9 +389,6 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
             SELF.folio := k.tzrpofi_doc_number;
             EXIT;
         END LOOP;
-
-        SELF.monedaDR := 'MXN';  /* TEMPORAL */
-        SELF.equivalenciaDR := 1;
 
         RETURN;
     END TY_TRALIX_LINEA_COMPDOCTREL;
@@ -512,9 +572,23 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             RETURN;
         END IF;
 
+        /* TODO: tomar el número de factura asociado al Docto Relacionado */
         idPagos := matricula || '_' || TRIM(TO_CHAR(tranNumber, '000000'));
+
         SELF.inicio_archivo := ty_tralix_linea_00(idPagos || '.txt', 'PPD');
         numLineas := numLineas + 1;
+
+        FOR j IN (
+            SELECT tvrtsta_comments
+            FROM tvrtsta
+            WHERE tvrtsta_pidm = gb_common.f_get_pidm(matricula)
+                AND tvrtsta_tran_number = tranNumber
+                AND tvrtsta_tsta_code LIKE 'F0%'
+            ORDER BY tvrtsta_tsta_code DESC
+        ) LOOP
+            idPagos := j.tvrtsta_comments;
+            EXIT;
+        END LOOP;
 
         SELF.envio_automatico := ty_tralix_linea_09(matricula);
 
@@ -557,7 +631,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         SELF.compTotales := TY_TRALIX_LINEA_COMPTOT(vln_pidm, tranNumber, tranOriginal);
         numLineas := numLineas + 1;
 
-        SELF.doctoRel := TY_TRALIX_LINEA_COMPDOCTREL(vln_pidm, tranNumber, tranOriginal, idPagos);
+        SELF.doctoRel := TY_TRALIX_LINEA_COMPDOCTREL(vln_pidm, tranNumber, tranOriginal, idPagos, SELF.compPagos.MonedaP);
         numLineas := numLineas + 1;
 
         SELF.conceptos := TY_TRALIX_ARR_05();

@@ -85,23 +85,65 @@ END;
 
 SELECT *
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084990')
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085021')
 ;
 
-PBA - 7798
+SELECT *
+FROM tbraccm
+WHERE tbraccm_pidm = gb_common.f_get_pidm('A00085021')
+;
 
-A00085005 - 24
+SELECT tzrpofi_sdoc_code, tzrpofi_doc_number, tzrpofi_iac_cde, tzrpofi_docnum_pos
+FROM tzrpofi
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085021')
+;
 
+SELECT *
+FROM gtvcurr
+;
 
+SELECT *
+FROM gurcurr
+ORDER BY gurcurr_activity_date DESC
+;
+
+SELECT TRIM(TO_CHAR(1, '0.000000')) FROM dual;
+
+SELECT *
+FROM tvrpays
+WHERE tvrpays_pidm = gb_common.f_get_pidm('A00085021')
+;
+
+SELECT tvrtsta_pidm, tvrtsta_tsta_code, tvrtsta_dloc_code
+FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085021')
+    AND tvrtsta_tran_number = 14
+    AND (tvrtsta_tsta_code LIKE 'F0%' OR tvrtsta_tsta_code LIKE 'T0%')
+;
+
+DECLARE
+    vlc_prueba VARCHAR2(5 CHAR);
+BEGIN
+    dbms_output.put_line(tztralx.tipo_proceso_tralix(gb_common.f_get_pidm('A00085021'), 15));
+END;
+
+SELECT tztralx.tipo_proceso_tralix(gb_common.f_get_pidm('A00085020'), 34)
+FROM dual;
+
+SELECT tvrtsta_tran_number, tvrtsta_tsta_code, tvrtsta_dloc_code, tvrtsta_comments
+FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085021')
+    -- AND tvrtsta_tsta_code LIKE 'FP%'
+;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084990';
-	tran_number NUMBER := 16;
+	matricula VARCHAR2(20 CHAR) := 'A00084990';   -- A00084989
+	tran_number NUMBER := 16;     -- 7
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '04');
+	vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '01');
 	--vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
@@ -165,15 +207,12 @@ COMMIT;
 
 SELECT *
 FROM gurdbug
-WHERE gurdbug_value LIKE '%matricula:A00084989%'
+WHERE gurdbug_parm like '%fn_factura_base_tralix%'
+    -- AND gurdbug_value LIKE 'matricula:%'
 ORDER BY gurdbug_activity_date DESC
 ;
 
-DECLARE
-    vlc_prueba VARCHAR2(5 CHAR);
-BEGIN
-    dbms_output.put_line(tztralx.tipo_proceso_tralix(105062, 7));
-END;
+
 
 UPDATE TVRPAYS
 SET

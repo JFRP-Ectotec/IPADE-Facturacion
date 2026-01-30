@@ -140,20 +140,25 @@ FROM tbraccd
 WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085005')
 ;
 
-matricula:A00085004 tran_number:26 tipo_pago_banner:99 tipo_pago_facturar:PPD proceso_factura:ANT tran_number_orig_ant:8 tran_number_imp:0
-matricula:A00085004 tran_number:26 tipo_pago_banner:28 tipo_pago_facturar:PPD proceso_factura:ANT tran_number_orig_ant:8 tran_number_imp:0
+SELECT *
+FROM gurdbug
+WHERE gurdbug_parm like '%_ant_%'
+/*    AND gurdbug_value LIKE 'matricula:%'*/
+ORDER BY gurdbug_activity_date DESC
+;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085004';
-	tran_number NUMBER := 26;
+	matricula VARCHAR2(20 CHAR) := 'A00085005';
+	tran_number NUMBER := 28;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 8;
+	tran_original NUMBER := 5;
 	tran_impuestos NUMBER := 0;
+	desc_original VARCHAR2(100 CHAR) := 'Prueba PALOMA Sinaloa';
 BEGIN
 	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD', 'FAC', 
-		tran_original, tran_impuestos);
+		tran_original, tran_impuestos, desc_original);
 	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
@@ -169,13 +174,13 @@ END;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085008';
-	tran_number NUMBER := 3;
+	matricula VARCHAR2(20 CHAR) := 'A00085016';
+	tran_number NUMBER := 16;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PUE');
-	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
+	-- vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '28', 'PUE');
+	vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
 	IF (vlt_respuesta.errores.COUNT > 0) THEN

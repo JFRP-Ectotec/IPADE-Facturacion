@@ -197,6 +197,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_01 UNDER TY_TRALIX_LINEA
     MEMBER PROCEDURE set_cargos(cargos NUMBER, imp_ret NUMBER),
     MEMBER PROCEDURE set_folio(serie VARCHAR2, folio VARCHAR2),
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
+    MEMBER PROCEDURE get_moneda(pidm IN NUMBER, tranNumber IN NUMBER,
+        tipo_moneda OUT VARCHAR2, cambio OUT NUMBER),
     MEMBER PROCEDURE validar
 );
 
@@ -217,7 +219,12 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
 
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
-        SELF.moneda := 'MXN';      -- Consultar catalogo c_Moneda
+
+        SELF.get_moneda(pidm, tranNumber,
+            SELF.moneda, SELF.tipoCambio);
+
+        -- SELF.moneda := 'MXN';      -- Consultar catalogo c_Moneda
+        -- SELF.tipoCambio := 1;
         SELF.metodoPago := metodoPago;  -- Consultar catalogo c_MetodoPago
         SELF.exportacion := '01';  -- Consultar catalogo c_Exportacion
         SELF.tipoComprobante := 'I';
@@ -273,7 +280,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
         self.subTotalNum := cargos;
         self.totalNum := cargos - NVL(self.descuento, 0) + NVL(self.taxesTrasladados, 0) 
             + NVL(self.taxesRetenidos, 0);
-        SELF.tipoCambio := 1;
+        -- SELF.tipoCambio := 1;
     END set_cargos;
 
     MEMBER PROCEDURE set_folio(serie VARCHAR2, folio VARCHAR2) IS
@@ -314,6 +321,38 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
             SELF.facAtrAdquirente
         ;
     END imprimir_linea;
+
+    MEMBER PROCEDURE get_moneda(pidm IN NUMBER, tranNumber IN NUMBER,
+        tipo_moneda OUT VARCHAR2, cambio OUT NUMBER) IS
+    BEGIN
+        tipo_moneda := 'MXN';
+        FOR i IN (
+            SELECT TBRACCM_CURR_CODE
+            FROM tbraccm
+            WHERE tbraccm_pidm = pidm
+                AND TBRACCM_ORIG_TRAN_NUMBER = tranNumber
+        ) LOOP
+            tipo_moneda := i.tbraccm_curr_code;
+        END LOOP;
+
+        IF (tipo_moneda NOT IN ('MXN', 'USD', 'EUR')) THEN
+            tipo_moneda := 'XXX';
+        END IF;
+
+        cambio := 1;
+        IF (tipo_moneda NOT IN ('MXN', 'XXX')) THEN
+            FOR j IN 
+            (
+                SELECT GURCURR_CONV_RATE_INV
+                FROM gurcurr
+                WHERE gurcurr_curr_code = tipo_moneda
+                ORDER BY gurcurr_activity_date DESC
+            ) LOOP
+                cambio := j.GURCURR_CONV_RATE_INV;
+                EXIT;
+            END LOOP;
+        END IF;
+    END get_moneda;
 
     MEMBER PROCEDURE validar IS
     BEGIN
@@ -615,7 +654,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
             SELF.numInterior := i.spraddr_house_number;
             SELF.colonia := i.spraddr_street_line3;
             SELF.localidad := i.spraddr_city;
-            SELF.referencia := i.spraddr_street_line4;
+            --SELF.referencia := i.spraddr_street_line4;
             SELF.estado := i.stvstat_desc;
             SELF.municipio := i.stvcnty_desc;
             SELF.domFiscal := i.spraddr_zip;
@@ -1836,7 +1875,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         vln_contador NUMBER;
     BEGIN
         SELF.estatus_debug := 'A';
-        SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'pidm:'||pidm||' tranOriginal:'||tranOriginal);
+        SELF.REGISTRAR_DEBUG('ajusta_conceptos', 'pidm:'||pidm||' tranOriginal:'||tranOriginal||' adicional:'||adicional);
 
         IF (tranOriginal <= 0) THEN
             RETURN;

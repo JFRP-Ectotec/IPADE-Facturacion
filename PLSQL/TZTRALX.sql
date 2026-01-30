@@ -4,11 +4,13 @@
 
 DROP SEQUENCE IPADEDEV.TEST_TRALIX_IP2_SEQ;
 
-CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP2_SEQ START WITH 1400 INCREMENT BY 1 MINVALUE 0 NOCYCLE NOCACHE NOORDER; 
+CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP2_SEQ START WITH 6125 INCREMENT BY 1 MINVALUE 0 NOCYCLE NOCACHE NOORDER; 
 
 DROP SEQUENCE IPADEDEV.TEST_TRALIX_IP1_SEQ;
 
-CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP1_SEQ START WITH 100 INCREMENT BY 1 MINVALUE 0 NOCYCLE NOCACHE NOORDER; 
+CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP1_SEQ START WITH 8000 INCREMENT BY 1 MINVALUE 0 NOCYCLE NOCACHE NOORDER; 
+
+SELECT test_tralix_ip2_seq.nextval from dual;
 
 CREATE OR REPLACE PACKAGE TZTRALX IS
     FUNCTION fn_obtener_idEmpresa(numEntidad IN VARCHAR2)
@@ -78,8 +80,15 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
 
     FUNCTION tipo_proceso_tralix(
         pin_pidm in NUMBER,
-        pin_tran_number IN NUMBER)
+        pin_tran_number IN NUMBER,
+        tipo_pago_banner OUT VARCHAR2)
         RETURN VARCHAR2;
+
+    PROCEDURE registrar_error_fa_pue(
+        pin_pidm IN NUMBER,
+        pin_tran_number IN NUMBER,
+        pic_tipo_pago IN VARCHAR2);
+
 END TZTRALX;
 /
 show errors;
@@ -559,7 +568,10 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
     BEGIN
         pr_registrar_debug('fn_factura_base', 'matricula:'||matricula||' tran_number:'||tran_number||' tipo_pago_banner:'||
             tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar||' proceso_factura:'||proceso_factura
-            ||' tran_number_orig_ant:'||tran_number_orig_ant||' tran_number_imp:'||tran_number_imp);
+            ||' tran_number_orig_ant:'||tran_number_orig_ant||' tran_number_imp:'||tran_number_imp
+            ||' desc_adicional:'||desc_adicional);
+
+        vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
 
         BEGIN
             vln_pidm := gb_common.f_get_pidm(matricula);
@@ -572,7 +584,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 RETURN vlt_respuesta;
         END;
 
-        vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
         vlt_respuesta.validar_datos;
 
         IF (vlt_respuesta.estatus != 'OK') THEN
@@ -901,7 +912,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     TZRPOFI_DCAT_CODE, TZRPOFI_IAC_CDE, TZRPOFI_INCL_BARCODE_IND, TZRPOFI_INCL_PI_IND, 
                     TZRPOFI_PI_IND, TZRPOFI_INCL_DOCNUM_IND, TZRPOFI_DOCNUM_POS, TZRPOFI_EXP_PDF_LBL_1,
                     TZRPOFI_INCL_SCHG_LABEL, TZRPOFI_DATE_CHG_1, TZRPOFI_DETC_CODE_CHG_1, 
-                    TZRPOFI_OVRD_FEE_1, TZRPOFI_PO_AMT_1,
+                    TZRPOFI_OVRD_FEE_1, TZRPOFI_PO_AMT_1, TZRPOFI_PO_OVRD_AMT_1,
                     TZRPOFI_DATA_ORIGIN, TZRPOFI_CREATE_USER_ID, TZRPOFI_CREATE_DATE, 
                     TZRPOFI_USER_ID, TZRPOFI_ACTIVITY_DATE
                 ) VALUES (
@@ -909,7 +920,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     'CSH', uuidTralix, 'N', 'N', 
                     'N', 'N', tran_number, fn_obtener_idEmpresa(vlc_num_entidad),
                     'N', SYSDATE, 'X', 
-                    tran_number_orig_ant, tran_number_imp,
+                    tran_number_orig_ant, tran_number_imp, datosFactura.info_gral_comprobante.tipoCambio,
                     'Tralix', USER, SYSDATE, 
                     USER, SYSDATE
                 );
@@ -970,8 +981,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pr_registrar_debug('fn_factura_tralix', 'matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar);
 
-        RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
-            tipo_pago_facturar, etiqueta, 'DEF', 0, 0);
+        RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
+            NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'DEF', 0, 0);
     END fn_factura_tralix;
 
     FUNCTION fn_factura_tralix_json(
@@ -1119,6 +1130,15 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlt_respuesta.mainData := vlc_objeto_principal;
         vlc_envioTralix := envio_canc_tralix(vlc_objeto_principal, 'CANC', vlb_estatusEnvio);
         bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
+
+        /* Insertar en TVRTSTA */
+        vlc_llamada := TZKRSTA.fn_registrar_canc_1(vln_pidm, tran_number, motivo_canc);
+        IF (vlc_llamada != 'OP_EXITOSA') THEN
+            rollback;
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error(vlc_llamada);
+            RETURN vlt_respuesta;
+        END IF;
 
         IF (vlb_estatusEnvio) THEN
             vlc_full_motivo_canc := motivo_canc;
@@ -1290,7 +1310,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             --     vlc_full_motivo_canc := vlc_full_motivo_canc || '- Operación nominativa relacionada en una factura global.';
             -- END IF;
 
-            vlc_llamada := tzkrsta.fn_sustituir_factura(vln_pidm_orig, tran_number_orig, matricula_nuevo);
+            vlc_llamada := tzkrsta.fn_sustituir_factura(vln_pidm_orig, tran_number_orig, vlc_guid_sustituir);
 
             IF (vlc_llamada != 'OP_EXITOSA') THEN
                 rollback;
@@ -1335,13 +1355,23 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tran_number_imp IN NUMBER DEFAULT 0,
         desc_adicional IN VARCHAR2 DEFAULT '')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
+        vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
     BEGIN
         pr_registrar_debug('fn_factura_ant_tralix', 'matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar
-            ||' tran_number_original:'||tran_number_original||' tran_number_imp:'||tran_number_imp);
+            ||' tran_number_original:'||tran_number_original||' tran_number_imp:'||tran_number_imp
+            ||' desc_adicional:'||desc_adicional);
 
-        RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
-            tipo_pago_facturar, etiqueta, 'ANT', tran_number_original, tran_number_imp);
+        -- IF (tipo_pago_facturar != 'PPD') THEN
+        --     vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
+        --     vlt_respuesta.estatus := 'ERROR';
+        --     vlt_respuesta.agregar_error('Una factura anticipada solo puede ser de pago PPD.');
+        --     RETURN vlt_respuesta;
+        -- END IF;
+
+        RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
+            NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'ANT', tran_number_original, 
+            tran_number_imp, desc_adicional);
     END fn_factura_ant_tralix;
 
     FUNCTION fn_factura_cp_tralix(
@@ -1355,8 +1385,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pr_registrar_debug('fn_factura_cp_tralix', 'matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' etiqueta:'||etiqueta);
 
-        RETURN fn_factura_base_tralix(matricula, tran_number, tipo_pago_banner,
-            'PPD', etiqueta, 'CP', 0, 0);
+        RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
+            'PPD', NVL(etiqueta, 'FAC'), 'CP', 0, 0);
     END fn_factura_cp_tralix;
 
     FUNCTION existe_factura(
@@ -1390,14 +1420,61 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         RETURN vlb_respuesta;
     END existe_factura;
 
+    FUNCTION transaccion_es_fa(
+        pin_pidm IN NUMBER,
+        pin_tran_number IN NUMBER
+    ) RETURN BOOLEAN IS
+        vlb_respuesta BOOLEAN := false;
+        vln_contador NUMBER := 0;
+    BEGIN
+        SELECT COUNT(*)
+        INTO vln_contador
+        FROM tvrtsta t1
+        WHERE t1.tvrtsta_pidm = pin_pidm
+            AND t1.tvrtsta_tran_number = pin_tran_number
+            AND t1.tvrtsta_dloc_code = 'FA'
+            AND t1.tvrtsta_tsta_code =
+            (SELECT MAX(t2.tvrtsta_tsta_code)
+            FROM tvrtsta t2
+            WHERE t2.tvrtsta_pidm = t1.tvrtsta_pidm
+                AND t2.tvrtsta_tran_number = t1.tvrtsta_tran_number
+                AND t2.tvrtsta_tsta_code LIKE 'T0%' 
+            )
+        ;
+
+        IF (vln_contador > 0) THEN
+            SELECT COUNT(*)
+            INTO vln_contador
+            FROM tvrtsta t1
+            WHERE t1.tvrtsta_pidm = pin_pidm
+                AND t1.tvrtsta_tran_number = pin_tran_number
+                AND t1.tvrtsta_dloc_code = 'PPD'
+                AND t1.tvrtsta_tsta_code =
+                (SELECT MAX(t2.tvrtsta_tsta_code)
+                FROM tvrtsta t2
+                WHERE t2.tvrtsta_pidm = t1.tvrtsta_pidm
+                    AND t2.tvrtsta_tran_number = t1.tvrtsta_tran_number
+                    AND t2.tvrtsta_tsta_code LIKE 'F0%' 
+                )
+            ;
+
+            vlb_respuesta := (vln_contador > 0);
+        END IF;
+
+        RETURN vlb_respuesta;
+    END transaccion_es_fa;
+
     FUNCTION tipo_proceso_tralix(
         pin_pidm in NUMBER,
-        pin_tran_number IN NUMBER)
+        pin_tran_number IN NUMBER,
+        tipo_pago_banner OUT VARCHAR2)
         RETURN VARCHAR2 IS
-        vlc_respuesta VARCHAR2(3 CHAR) := 'ERR';  
+        vlc_respuesta VARCHAR2(3 CHAR) := 'ER';  
         vlc_cod_detalle TBRACCD.TBRACCD_DETAIL_CODE%TYPE;
         vln_contador NUMBER;
     BEGIN
+        pr_registrar_debug('tipo_proceso_tralix', 'PIDM:'||pin_pidm||' Tran_Number:'||pin_tran_number);
+
         BEGIN
             FOR i IN (
                 SELECT tbraccd_detail_code
@@ -1412,33 +1489,77 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 RETURN vlc_respuesta;
             END IF;
 
+            FOR k IN (
+                SELECT tvrtsta_comments
+                FROM tvrtsta
+                WHERE tvrtsta_pidm = pin_pidm
+                    AND tvrtsta_tran_number = pin_tran_number
+                    AND tvrtsta_tsta_code LIKE 'FP%'
+                ORDER BY tvrtsta_tsta_code
+            ) LOOP
+                tipo_pago_banner := k.tvrtsta_comments;
+                EXIT;
+            END LOOP;
+ 
             vlc_respuesta := 'FC';
-            IF (vlc_cod_detalle = 'FANT') THEN
-                vlc_respuesta := 'FA';
-            ELSE
-                SELECT COUNT(*)
-                INTO vln_contador
-                FROM tbraccd t1 JOIN tvrtsta t3 
-                    ON (t1.tbraccd_pidm = t3.tvrtsta_pidm
-                        AND t1.tbraccd_tran_number_paid = t3.tvrtsta_tran_number)
-                WHERE t1.tbraccd_pidm = pin_pidm
-                    AND t1.tbraccd_tran_number = pin_tran_number
-                    AND (
-                        (tvrtsta_tsta_code LIKE 'T0%' AND tvrtsta_dloc_code = 'FA')
-                        OR (tvrtsta_tsta_code LIKE 'F0%' AND tvrtsta_dloc_code = 'PPD'))
-                ;
 
-                IF (vln_contador >= 2) THEN
-                    vlc_respuesta := 'FP';
-                END IF;
+            IF (transaccion_es_fa(pin_pidm, pin_tran_number)) THEN
+                vlc_respuesta := 'FA';
+                pr_registrar_debug('tipo_proceso_tralix', 'Factura anticipada');
+            ELSE
+                -- Buscar todas las transacciones relacionadas con esta 
+                FOR k IN (
+                    SELECT t1.tbraccd_tran_number, t1.tbraccd_receipt_number
+                    FROM tbraccd t1
+                    WHERE t1.tbraccd_pidm = pin_pidm
+                        AND t1.tbraccd_tran_number != pin_tran_number
+                        AND EXISTS
+                        (
+                            SELECT 1
+                            FROM tbraccd t2
+                            WHERE t2.tbraccd_pidm = t1.tbraccd_pidm
+                                AND t2.tbraccd_receipt_number = t1.tbraccd_receipt_number
+                                AND t2.tbraccd_tran_number = pin_tran_number
+                        )
+                ) LOOP
+                    pr_registrar_debug('tipo_proceso_tralix', 'PIDM:'||pin_pidm||' Tran_Number:'||pin_tran_number);
+                    IF (transaccion_es_fa(pin_pidm, k.tbraccd_tran_number)) THEN
+                        vlc_respuesta := 'FP';
+                        EXIT;    
+                    END IF;
+                END LOOP;
+                 
             END IF;
         EXCEPTION
             WHEN OTHERS THEN
-                vlc_respuesta := 'ERR';
+                vlc_respuesta := 'ER';
         END;
 
         RETURN vlc_respuesta;
     END tipo_proceso_tralix;
+
+    PROCEDURE registrar_error_fa_pue(
+        pin_pidm IN NUMBER,
+        pin_tran_number IN NUMBER,
+        pic_tipo_pago IN VARCHAR2) IS
+        vlc_factura VARCHAR2(50 CHAR);
+    BEGIN
+        FOR i IN (
+            SELECT tvrtsta_comments
+            FROM tvrtsta
+            WHERE tvrtsta_pidm = pin_pidm
+                AND tvrtsta_tran_number = pin_tran_number
+                AND tvrtsta_tsta_code LIKE 'F0%'
+            ORDER BY tvrtsta_tsta_code DESC
+        ) LOOP
+            vlc_factura := i.tvrtsta_comments;
+            EXIT;
+        END LOOP;
+
+        pr_log_error(pin_pidm, NVL(vlc_factura, TO_CHAR(pin_tran_number)), 
+            'No se puede facturar anticipada con pago PUE',
+            0, '99', pin_tran_number);
+    END registrar_error_fa_pue;
 END TZTRALX;
 /
 show errors;
