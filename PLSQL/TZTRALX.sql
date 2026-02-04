@@ -538,7 +538,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vln_numFactura NUMBER;
 
         vlc_camp_code  SATURN.STVCAMP.STVCAMP_CODE%TYPE;
-        vlc_num_entidad  VARCHAR2(1 CHAR);
+        vlc_num_entidad VARCHAR2(1 CHAR);
         vlc_num_tipoDir VARCHAR2(1 CHAR);
         vlc_objeto_principal CLOB;
         vln_pidm SATURN.SPRIDEN.SPRIDEN_PIDM%TYPE;
@@ -737,6 +737,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 FROM tbrappl
                 WHERE tbrappl_pidm = vln_pidm
                     AND tbrappl_pay_tran_number = tran_number
+                    AND tbrappl_reappl_ind IS NULL
             ) LOOP
                 vln_tran_number_orig := z.tbrappl_chg_tran_number;
             END LOOP;
@@ -1132,6 +1133,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
 
         /* Insertar en TVRTSTA */
+        /* PENDIENTE: revisar si aun con error de Tralix se registra PC1 o PC2 en TVRTSTA */
         vlc_llamada := TZKRSTA.fn_registrar_canc_1(vln_pidm, tran_number, motivo_canc);
         IF (vlc_llamada != 'OP_EXITOSA') THEN
             rollback;
@@ -1500,36 +1502,56 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 tipo_pago_banner := k.tvrtsta_comments;
                 EXIT;
             END LOOP;
- 
-            vlc_respuesta := 'FC';
 
             IF (transaccion_es_fa(pin_pidm, pin_tran_number)) THEN
                 vlc_respuesta := 'FA';
                 pr_registrar_debug('tipo_proceso_tralix', 'Factura anticipada');
-            ELSE
-                -- Buscar todas las transacciones relacionadas con esta 
-                FOR k IN (
-                    SELECT t1.tbraccd_tran_number, t1.tbraccd_receipt_number
-                    FROM tbraccd t1
-                    WHERE t1.tbraccd_pidm = pin_pidm
-                        AND t1.tbraccd_tran_number != pin_tran_number
-                        AND EXISTS
-                        (
-                            SELECT 1
-                            FROM tbraccd t2
-                            WHERE t2.tbraccd_pidm = t1.tbraccd_pidm
-                                AND t2.tbraccd_receipt_number = t1.tbraccd_receipt_number
-                                AND t2.tbraccd_tran_number = pin_tran_number
-                        )
-                ) LOOP
-                    pr_registrar_debug('tipo_proceso_tralix', 'PIDM:'||pin_pidm||' Tran_Number:'||pin_tran_number);
-                    IF (transaccion_es_fa(pin_pidm, k.tbraccd_tran_number)) THEN
-                        vlc_respuesta := 'FP';
-                        EXIT;    
-                    END IF;
-                END LOOP;
-                 
+                RETURN vlc_respuesta;
             END IF;
+
+            -- Buscar todas las transacciones relacionadas con esta 
+            vlc_respuesta := 'FC';
+            FOR k IN (
+                SELECT t1.tbraccd_tran_number, t1.tbraccd_receipt_number
+                FROM tbraccd t1
+                WHERE t1.tbraccd_pidm = pin_pidm
+                    AND t1.tbraccd_tran_number != pin_tran_number
+                    AND EXISTS
+                    (
+                        SELECT 1
+                        FROM tbraccd t2
+                        WHERE t2.tbraccd_pidm = t1.tbraccd_pidm
+                            AND t2.tbraccd_receipt_number = t1.tbraccd_receipt_number
+                            AND t2.tbraccd_tran_number = pin_tran_number
+                    )
+            ) LOOP
+                pr_registrar_debug('tipo_proceso_tralix', 'PIDM:'||pin_pidm||' Tran_Number:'||pin_tran_number);
+                IF (transaccion_es_fa(pin_pidm, k.tbraccd_tran_number)) THEN
+                    vlc_respuesta := 'FP';
+                    EXIT;
+                ELSE
+                    /* Verificar si hay error de FANT con tipo de pago PUE */
+                    SELECT COUNT(*)
+                    INTO vln_contador
+                    FROM tvrtsta t1
+                    WHERE t1.tvrtsta_pidm = pin_pidm
+                        AND t1.tvrtsta_tran_number = k.tbraccd_tran_number
+                        AND t1.tvrtsta_dloc_code = 'PUE'
+                        AND t1.tvrtsta_tsta_code =
+                        (SELECT MAX(t2.tvrtsta_tsta_code)
+                        FROM tvrtsta t2
+                        WHERE t2.tvrtsta_pidm = t1.tvrtsta_pidm
+                            AND t2.tvrtsta_tran_number = t1.tvrtsta_tran_number
+                            AND t2.tvrtsta_tsta_code LIKE 'F0%' 
+                        )
+                    ;
+
+                    IF (vln_contador > 0) THEN
+                        vlc_respuesta := 'ER';
+                    END IF;
+                END IF;
+            END LOOP;
+                
         EXCEPTION
             WHEN OTHERS THEN
                 vlc_respuesta := 'ER';

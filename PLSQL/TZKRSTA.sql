@@ -421,19 +421,26 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         registros TY_TRALIX_TSTA_ARR;
         receptor TY_TRALIX_LINEA_03;
         secuencial NUMBER;
+
+        vln_tipo_factura VARCHAR2(10 CHAR);
     BEGIN
         registros := TY_TRALIX_TSTA_ARR();
 
         pr_registrar_debug('fn_registrar','tipo_factura:'||tipo_factura);
 
+        vln_tipo_factura := tipo_factura;
         IF (tipo_factura != 'FP') THEN
             vlc_valor := datos_factura.info_gral_comprobante.cfdi;
+            IF (datos_factura.receptor.esPubGral = 'TRUE') THEN
+                vln_tipo_factura := 'FP';
+            END IF;
         ELSE
             vlc_valor := datos_compPago.info_gral_comprobante.cfdi;
+            vln_tipo_factura := 'FC';
         END IF;
-        pr_registrar_debug('fn_registrar',vlc_valor || ' - ' || vlc_valor||' - '||tipo_factura);
+        pr_registrar_debug('fn_registrar',vlc_valor || ' - ' || vlc_valor||' - '||vln_tipo_factura);
 
-        vlc_respCall := fn_registrar_tipo_factura(pidm, tran_number, tipo_factura, 
+        vlc_respCall := fn_registrar_tipo_factura(pidm, tran_number, vln_tipo_factura, 
             vlc_valor, registros);
         IF (vlc_respCall != 'OP_EXITOSA') THEN
             return vlc_respCall;
@@ -488,7 +495,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         -- pr_registrar_tvsta('FP'||vlc_seqCodigo, '', datos_factura.formaPago, registros);
         vlc_codigo := 'FP'||vlc_seqCodigo;
         IF (tipo_factura != 'FP') THEN
-            vlc_valor := datos_factura.info_gral_comprobante.metodoPago;
+            vlc_valor := datos_factura.info_gral_comprobante.formaPago;
         ELSE
             vlc_valor := 'PUE';
         END IF;

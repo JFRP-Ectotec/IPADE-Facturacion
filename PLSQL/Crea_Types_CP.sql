@@ -90,7 +90,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
             FROM tbraccd t1
             WHERE t1.tbraccd_pidm = pidm
                 AND t1.tbraccd_tran_number = tranNumberCP
-                AND t1.tbraccd_tran_number_paid = tranOriginal
+                -- AND t1.tbraccd_tran_number_paid = tranOriginal
         ) LOOP
             SELF.Monto := i.tbraccd_amount;
         END LOOP;
@@ -572,6 +572,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             RETURN;
         END IF;
 
+        numLineas := 0;
+
         /* TODO: tomar el número de factura asociado al Docto Relacionado */
         idPagos := matricula || '_' || TRIM(TO_CHAR(tranNumber, '000000'));
 
@@ -590,7 +592,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             EXIT;
         END LOOP;
 
+        SELF.estatus_debug := 'O';
         SELF.envio_automatico := ty_tralix_linea_09(matricula);
+        SELF.registrar_debug('TY_TRALIX_COMPPAGO', SELF.envio_automatico.imprimir_linea);
 
         IF (NVL(SELF.envio_automatico.eMail, '*') != '*') THEN
             numLineas := numLineas + 1;
@@ -606,7 +610,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         SELF.info_gral_comprobante.moneda := 'XXX';
         numLineas := numLineas + 1;
 
-        SELF.estatus_debug := 'A';
+       
         SELF.REGISTRAR_DEBUG('TY_TRALIX_COMPPAGO', SELF.info_gral_comprobante.imprimir_linea);
         -- SELF.estatus_debug := 'I';
 

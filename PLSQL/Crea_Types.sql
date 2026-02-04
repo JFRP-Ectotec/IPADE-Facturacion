@@ -771,7 +771,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
 
         SELF.esPubGral := 'TRUE';
 
-        SELF.nombreParticipante := 'PÚBLICO EN GENERAL';
+        --SELF.nombreParticipante := 'PÚBLICO EN GENERAL';
         -- SELF.programa := '';
     END datos_pubgral;
 
@@ -1292,7 +1292,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_09 AS
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
         correo VARCHAR2(200 CHAR);
+        numGrupo VARCHAR2(1 CHAR);
     BEGIN
+        SELF.estatus_debug := 'O';
+        SELF.raiz_debug := 'LINEA_09';
+
         SELECT self INTO parent FROM dual;
         parent.INIT('09');
 
@@ -1301,29 +1305,47 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_09 AS
 
         SELF.asunto := 'CFDI IPADE de '||matricula;
 
+        /* Determinar RFC */
+        FOR j IN (
+            SELECT *
+            FROM goradid 
+            WHERE goradid_pidm = gb_common.f_get_pidm(matricula)
+                AND goradid_adid_code LIKE '%RFC'
+                AND goradid_additional_id LIKE '*%'
+        ) LOOP
+            numGrupo := SUBSTR(j.goradid_adid_code, 1, 1);
+            EXIT;
+        END LOOP;
+
+        SELF.REGISTRAR_DEBUG('LINEA_09', 'numGrupo:'||numGrupo);
+
         /* Determinar correo */
         FOR i IN (
             SELECT spr.spraddr_street_line4
             FROM spraddr spr 
-                JOIN spriden sp ON (spr.spraddr_pidm = sp.spriden_pidm)
-            WHERE sp.spriden_id = matricula
-                AND sp.spriden_change_ind IS NULL
+            WHERE spr.spraddr_pidm = gb_common.f_get_pidm(matricula)
+                AND spr.spraddr_atyp_code = 'F'||numGrupo
                 AND spr.spraddr_street_line4 LIKE '%@%'
             ORDER BY spr.spraddr_activity_date DESC
         ) LOOP
             correo := i.spraddr_street_line4;
 
             IF (NVL(TRIM(correo), '|') != '|') THEN
+                SELF.eMail := correo;
                 EXIT;
             END IF;
         END LOOP;
+
+        SELF.REGISTRAR_DEBUG('LINEA_09', 'correo 1:'||correo);
+
+        SELF.estatus_debug := 'I';
 
         IF (NVL(TRIM(correo), '|') = '|') THEN
             FOR j IN (
                 SELECT g.goremal_email_address
                 FROM goremal g
-                    JOIN spriden s ON (g.goremal_pidm = s.spriden_pidm)
-                WHERE g.goremal_emal_code = 'INS'
+                WHERE g.goremal_pidm = gb_common.f_get_pidm(matricula)
+                    AND g.goremal_emal_code = 'INS'
                 ORDER BY g.goremal_activity_date DESC
             ) LOOP
                 correo := j.goremal_email_address;

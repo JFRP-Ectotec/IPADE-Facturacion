@@ -45,8 +45,8 @@ BEGIN
 END;
 
 SELECT *
-FROM tbraccd
-WHERE tbraccd_pidm = 'A00084989'
+FROM tbrappl
+WHERE tbrappl_pidm = gb_common.f_get_pidm('A00085025')
 ;
 
 SELECT NVL(SUM(tbrappl_amount), 0) as saldoPagado,
@@ -85,7 +85,7 @@ END;
 
 SELECT *
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085021')
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084868')
 ;
 
 SELECT *
@@ -93,9 +93,14 @@ FROM tbraccm
 WHERE tbraccm_pidm = gb_common.f_get_pidm('A00085021')
 ;
 
-SELECT tzrpofi_sdoc_code, tzrpofi_doc_number, tzrpofi_iac_cde, tzrpofi_docnum_pos
+SELECT tzrpofi_sdoc_code, tzrpofi_doc_number, tzrpofi_iac_cde, tzrpofi_docnum_pos, tzrpofi_activity_date
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085021')
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00084868')
+;
+
+SELECT *
+FROM tvvdloc
+WHERE tvvdloc_code LIKE 'F%'
 ;
 
 SELECT *
@@ -127,19 +132,19 @@ BEGIN
     dbms_output.put_line(tztralx.tipo_proceso_tralix(gb_common.f_get_pidm('A00085021'), 15));
 END;
 
-SELECT tztralx.tipo_proceso_tralix(gb_common.f_get_pidm('A00085020'), 34)
+SELECT tztralx.tipo_proceso_tralix(gb_common.f_get_pidm('A00084868'), 24)
 FROM dual;
 
 SELECT tvrtsta_tran_number, tvrtsta_tsta_code, tvrtsta_dloc_code, tvrtsta_comments
 FROM tvrtsta
-WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085021')
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084868')
     -- AND tvrtsta_tsta_code LIKE 'FP%'
 ;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084990';   -- A00084989
-	tran_number NUMBER := 16;     -- 7
+	matricula VARCHAR2(20 CHAR) := 'A00084868';   -- A00084989
+	tran_number NUMBER := 22;     -- 7
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -296,4 +301,28 @@ SELECT *
 FROM tzrpofi
 WHERE tzrpofi_pidm = 105062
     AND tzrpofi_docnum_pos = 7
+;
+
+SELECT TO_CHAR(SYSDATE, 'DD-MON-YYYY HH24:MI:SS') FROM DUAL;
+
+SELECT spraddr_atyp_code, spraddr_street_line4
+FROM spraddr
+WHERE spraddr_pidm = gb_common.f_get_pidm('A00085025')
+;
+
+SELECT spr.spraddr_street_line4
+FROM spraddr spr 
+WHERE spr.spraddr_pidm = gb_common.f_get_pidm('A00085025')
+    AND spr.spraddr_street_line4 LIKE '%@%'
+ORDER BY spr.spraddr_activity_date DESC
+;
+
+SELECT *
+FROM goremal
+WHERE goremal_pidm  = gb_common.f_get_pidm('A00085025')
+;
+
+SELECT *
+FROM TVVTSTA
+WHERE tvvtsta_code = 'CL4' --UPPER(tvvtsta_desc) LIKE '%CORREO%'
 ;
