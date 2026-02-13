@@ -616,9 +616,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
 
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
 
-        IF (SELF.receptor.esPubGral = 'TRUE') THEN
-            SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;
-        END IF;
+        -- IF (SELF.receptor.esPubGral = 'TRUE') THEN
+        --     SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;
+        -- END IF;
         SELF.receptor.usoCFDI := 'CP01';
 
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;

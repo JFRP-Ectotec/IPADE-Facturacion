@@ -1,0 +1,6 @@
+{"uuid":"EEA19FE5-E428-4B8D-BA5B-39462E423BB3",
+"status":"201",
+"descripcion":"CANCELADO_SIN_ACEPTACION",
+"URLAcuse_XML":"/6dfcc2bf-734f-4b36-961c-a23f62569870/descargasCfdi?idCfdi=d8e6ccc0c345a697a5e61e2557849d89&representacion=ACUSE",
+"URLAcuse_PDF":"/6dfcc2bf-734f-4b36-961c-a23f62569870/descargasCfdi?idCfdi=d8e6ccc0c345a697a5e61e2557849d89&representacion=ACUSE_PDF
+"}

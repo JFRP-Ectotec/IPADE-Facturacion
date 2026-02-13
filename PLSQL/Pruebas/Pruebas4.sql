@@ -233,10 +233,31 @@ WHERE s.spriden_id = 'A00084799'
 ORDER BY t.tzrpofi_doc_number DESC
 ;
 
+SELECT *
+FROM spriden
+WHERE spriden_pidm = 104669
+;
+
+SELECT *
+FROM tvrtsta
+WHERE tvrtsta_pidm = 104669
+--    AND tvrtsta_tran_number = 184
+;
+
+
+DELETE 
+FROM tvrtsta
+WHERE tvrtsta_pidm = 104669
+    AND tvrtsta_tran_number = 184
+    AND tvrtsta_seq_no > 14
+;
+
+COMMIT;
+
 DECLARE
 	datos_banner CLOB;
 	matricula VARCHAR2(20 CHAR) := 'PUBGRAL1';
-	tran_number NUMBER := 142;
+	tran_number NUMBER := 184;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -252,6 +273,8 @@ BEGIN
 		END LOOP;
 	END IF;
 END;
+
+ROLLBACK;
 
 SELECT *
 FROM tvrpays

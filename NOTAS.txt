@@ -3,3 +3,9 @@ DOCUMENTO: General -> Documentación -> Facturación -> Api_Facturacion_Corregid
 Generación de CFDI.
 
 Para el campo de todo en pipes, es "Layout Anexo 20_ComplementoPagos_2.0.xlsx"
+
+-- Compilar 2026-02-10
+Crea_types_CP - TYPE BODY TY_TRALIX_COMPPAGO
+Crea_types - TYPE BODY LINEA_03
+  TYPE BODY LINEA_05
+  Type Body TY_TRALIX_FACTURA

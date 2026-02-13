@@ -89,6 +89,11 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         pin_tran_number IN NUMBER,
         pic_tipo_pago IN VARCHAR2);
 
+    FUNCTION fn_verifica_cancelacion(
+        pin_pidm IN NUMBER,
+        pin_tran_number IN NUMBER
+    ) RETURN VARCHAR2;
+
 END TZTRALX;
 /
 show errors;
@@ -181,6 +186,29 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlc_nombreArchivo := matricula || '_' || tran_number || '.txt';
         RETURN vlc_nombreArchivo;
     END fn_generar_nombreArchivo;
+
+    FUNCTION crea_objeto_estatus_fact(
+        pic_uuid IN VARCHAR2,
+        pic_empresa IN VARCHAR2
+    ) RETURN CLOB IS
+        vlc_respuesta CLOB;
+    BEGIN
+        IF (LENGTH(NVL(pic_uuid, '')) < 1) THEN
+            RETURN vlc_respuesta;
+        END IF;
+
+        gokjson.initialize_clob_output;
+        gokjson.open_object(NULL);
+
+        gokjson.write('idEmpresa', pic_empresa);
+        gokjson.write('uuid', pic_uuid);
+        gokjson.write('produccion', 'false');
+
+        gokjson.close_object;
+        vlc_respuesta := gokjson.get_clob_output;
+	    gokjson.free_output;
+        RETURN vlc_respuesta;
+    END crea_objeto_estatus_fact;
 
     FUNCTION crea_objeto_principal(
         matricula IN VARCHAR2,
@@ -311,6 +339,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
             -- l_payload_def := REPLACE(l_payload_temp, '\\', '\');
             l_payload_def := CONVERT(REPLACE(l_payload_temp, '\\', '\'), 'AL32UTF8', 'WE8ISO8859P1');
+
+            pr_registrar_debug('envio_tralix', 'Payload:'||l_payload_def);
             -- l_payload_def := CONVERT(dbms_lob.substr(l_payload_def, dbms_lob.getlength(l_payload_def)),
             --      'AL32UTF8', NLS_CHARSET_NAME(NLS_CHARSET_ID('AL32UTF8')));
             -- dbms_output.put_line(l_payload_def);
@@ -374,6 +404,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         l_indice := l_indice + LENGTH(l_statusCodeTag);
 
         lr_status := SUBSTR(l_response, l_indice, l_ind_fin - l_indice);
+
+        pr_registrar_debug('envio_tralix', 'Estatus:' || lr_status);
 
         -- Determinar body
         l_indice := INSTR(l_response, l_bodyTag);
@@ -1047,7 +1079,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         -- TEMPORAL forzar para demo INICIO
         IF (l_operacion = 'CANC') THEN
             
-            l_response := '{"statusCode":200,"headers":{"Content-Type":"application/json"},"body":"Error en el servicio de cancelaci\u00F3n"}';
+            l_response := '{"statusCode":200,"headers":{"Content-Type":"application/json"},"body":{"status":"201","descripcion":"CANCELADO_SIN_ACEPTACION"}}';
             estatus := TRUE;
         END IF;
         -- TEMPORAL forzar para demo FIN
@@ -1073,7 +1105,13 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlc_llamada VARCHAR2(4000 CHAR);
         vlc_numFactura VARCHAR2(100 CHAR);
         vlc_empresa VARCHAR2(100 CHAR);
-        vlc_full_motivo_canc VARCHAR2(1000 CHAR);
+
+        ln_indice NUMBER := 0;
+        ln_indFin NUMBER := 0;
+        vlc_buscarTag VARCHAR2(100 CHAR);
+        vlc_respuestaCanc VARCHAR2(200 CHAR);
+        vlc_status VARCHAR2(20 CHAR);
+        vlc_descEstatus VARCHAR2(100 CHAR);
     BEGIN
         vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
         IF (vlt_respuesta.estatus != 'OK') THEN
@@ -1087,8 +1125,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             WHEN OTHERS THEN
                 vlt_respuesta.estatus := 'ERROR';
                 vlt_respuesta.agregar_error('No existe la matrícula');
-                -- vlt_respuesta.errores.EXTEND;
-                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la matrícula');
                 RETURN vlt_respuesta;
         END;
 
@@ -1122,15 +1158,58 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         IF (NVL(vlc_guid_cancelar, '|') = '|') THEN
             vlt_respuesta.estatus := 'ERROR';
             vlt_respuesta.agregar_error('No existe la factura a cancelar');
-            -- vlt_respuesta.errores.EXTEND;
-            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR('No existe la factura a cancelar');
             RETURN vlt_respuesta;
         END IF;
 
         vlc_objeto_principal := crea_objeto_sust_tralix(vlc_guid_cancelar, '', motivo_canc, vlc_empresa);
         vlt_respuesta.mainData := vlc_objeto_principal;
+
         vlc_envioTralix := envio_canc_tralix(vlc_objeto_principal, 'CANC', vlb_estatusEnvio);
+
         bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
+
+        bufferMensaje := REPLACE(bufferMensaje, ' ', '');
+
+        vlc_respuestaCanc := motivo_canc || ' - ';
+
+        /* Obtener código de estatus de la respuesta */
+        vlc_buscarTag := '"status":"';
+        ln_indice := INSTR(bufferMensaje, vlc_buscarTag);
+        ln_indFin := INSTR(bufferMensaje, '"', ln_indice + LENGTH(vlc_buscarTag));
+        vlc_status := SUBSTR(bufferMensaje, ln_indice + LENGTH(vlc_buscarTag), 
+            ln_indFin - (ln_indice + LENGTH(vlc_buscarTag)));
+
+        vlc_respuestaCanc := vlc_respuestaCanc || vlc_status || ' - ';
+        
+        vlc_buscarTag := '"descripcion":"';
+        ln_indice := INSTR(bufferMensaje, vlc_buscarTag);
+        ln_indFin := INSTR(bufferMensaje, '"', ln_indice + LENGTH(vlc_buscarTag));
+        vlc_descEstatus := SUBSTR(bufferMensaje, ln_indice + LENGTH(vlc_buscarTag), 
+            ln_indFin - (ln_indice + LENGTH(vlc_buscarTag)));
+        vlc_respuestaCanc := vlc_respuestaCanc || vlc_descEstatus;
+
+        IF (vlc_status != '201') THEN
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error(vlc_status || '-' || vlc_descEstatus);
+            BEGIN
+                pr_log_error(vln_pidm, vlc_numFactura, vlc_status || '-' || vlc_descEstatus,
+                    0, motivo_canc, tran_number);
+            EXCEPTION
+                WHEN OTHERS THEN
+                    rollback;
+                    vlt_respuesta.estatus := 'ERROR';
+                    vlt_respuesta.agregar_error(sqlerrm);
+                    RETURN vlt_respuesta;
+            END;
+        END IF;
+
+        /* UPDATE en TZRPOFI la respuesta */
+        UPDATE tzrpofi
+        SET TZRPOFI_EXP_PDF_LBL_2 = vlc_respuestaCanc
+        WHERE tzrpofi_pidm = vln_pidm
+            AND tzrpofi_docnum_pos = tran_number
+            AND tzrpofi_iac_cde = vlc_guid_cancelar
+        ;
 
         /* Insertar en TVRTSTA */
         /* PENDIENTE: revisar si aun con error de Tralix se registra PC1 o PC2 en TVRTSTA */
@@ -1142,32 +1221,10 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             RETURN vlt_respuesta;
         END IF;
 
-        IF (vlb_estatusEnvio) THEN
-            vlc_full_motivo_canc := motivo_canc;
-            IF (motivo_canc = '02') THEN
-                vlc_full_motivo_canc := vlc_full_motivo_canc || '- Comprobante emitido con errores sin relación.';
-            ELSIF (motivo_canc = '03') THEN
-                vlc_full_motivo_canc := vlc_full_motivo_canc || '- No se llevó a cabo la operación.';
-            ELSIF (motivo_canc = '04') THEN
-                vlc_full_motivo_canc := vlc_full_motivo_canc || '- Operación nominativa relacionada en una factura global.';
-            END IF;
-            vlc_llamada := tzkrsta.fn_cancelar_factura(vln_pidm, tran_number, vlc_full_motivo_canc);
-
-            IF (vlc_llamada != 'OP_EXITOSA') THEN
-                rollback;
-                vlt_respuesta.estatus := 'ERROR';
-                vlt_respuesta.agregar_error(vlc_llamada);
-                -- vlt_respuesta.errores.EXTEND;
-                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(vlc_llamada);
-                RETURN vlt_respuesta;
-            END IF;
-            COMMIT;
-        ELSE
+        IF (NOT(vlb_estatusEnvio)) THEN
             /* Guardar en TZRPAYS, con status = 'T' */
             vlt_respuesta.estatus := 'ERROR';
             vlt_respuesta.agregar_error(bufferMensaje);
-            -- vlt_respuesta.errores.EXTEND;
-            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
             BEGIN
                 pr_log_error(vln_pidm, vlc_numFactura, bufferMensaje,
                     0, motivo_canc, tran_number);
@@ -1176,10 +1233,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     rollback;
                     vlt_respuesta.estatus := 'ERROR';
                     vlt_respuesta.agregar_error(sqlerrm);
-                    -- vlt_respuesta.errores.EXTEND;
-                    -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(sqlerrm);
                     RETURN vlt_respuesta;
             END;
+        COMMIT;
         END IF;
 
         RETURN vlt_respuesta;
@@ -1303,43 +1359,29 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 
 
         IF (vlb_estatusEnvio) THEN
-            -- vlc_full_motivo_canc := motivo_canc;
-            -- IF (motivo_canc = '02') THEN
-            --     vlc_full_motivo_canc := vlc_full_motivo_canc || '- Comprobante emitido con errores sin relación.';
-            -- ELSIF (motivo_canc = '03') THEN
-            --     vlc_full_motivo_canc := vlc_full_motivo_canc || '- No se llevó a cabo la operación.';
-            -- ELSIF (motivo_canc = '04') THEN
-            --     vlc_full_motivo_canc := vlc_full_motivo_canc || '- Operación nominativa relacionada en una factura global.';
-            -- END IF;
-
             vlc_llamada := tzkrsta.fn_sustituir_factura(vln_pidm_orig, tran_number_orig, vlc_guid_sustituir);
 
             IF (vlc_llamada != 'OP_EXITOSA') THEN
                 rollback;
                 vlt_respuesta.estatus := 'ERROR';
                 vlt_respuesta.agregar_error(vlc_llamada);
-                -- vlt_respuesta.errores.EXTEND;
-                -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(vlc_llamada);
                 RETURN vlt_respuesta;
             END IF;
             COMMIT;
         ELSE
             vlt_respuesta.estatus := 'ERROR';
             vlt_respuesta.agregar_error(bufferMensaje);
-            -- vlt_respuesta.errores.EXTEND;
-            -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(bufferMensaje);
 
             /* Guardar en TZRPAYS, con status = 'T' */
             BEGIN
                 pr_log_error(vln_pidm_orig, vlc_numFactura, bufferMensaje,
                     0, motivo_canc, tran_number_orig);
+                COMMIT;
             EXCEPTION
                 WHEN OTHERS THEN
                     rollback;
                     vlt_respuesta.estatus := 'ERROR';
                     vlt_respuesta.agregar_error(sqlerrm);
-                    -- vlt_respuesta.errores.EXTEND;
-                    -- vlt_respuesta.errores(vlt_respuesta.errores.COUNT) := TY_TRALIX_ROW_ERROR(sqlerrm);
                     RETURN vlt_respuesta;
             END;
         END IF;
@@ -1582,6 +1624,84 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             'No se puede facturar anticipada con pago PUE',
             0, '99', pin_tran_number);
     END registrar_error_fa_pue;
+
+    FUNCTION fn_verifica_cancelacion(
+        pin_pidm IN NUMBER,
+        pin_tran_number IN NUMBER
+    ) RETURN VARCHAR2 IS
+        vlc_respuesta VARCHAR2(500 CHAR) := 'OP_EXITOSA';
+        vlc_objeto_estatus CLOB;
+        bufferMensaje CLOB;
+        vlc_envioTralix CLOB;
+        estatus BOOLEAN := TRUE;
+        vlc_uuid VARCHAR2(100 CHAR);
+        vlc_empresa VARCHAR2(100 CHAR);
+        vlc_motivo_canc VARCHAR2(200 CHAR);
+        ln_indice NUMBER := 0;
+        ln_indFin NUMBER := 0;
+        vlc_tagBuscar VARCHAR2(100 CHAR) := ' - ';
+        vlc_estatus_Factura VARCHAR2(50 CHAR);
+        vlc_llamada VARCHAR2(200 CHAR);
+        vlc_full_motivo_canc VARCHAR2(500 CHAR);
+    BEGIN
+        BEGIN
+            FOR i IN (
+                SELECT TZRPOFI_IAC_CDE, TZRPOFI_EXP_PDF_LBL_1,
+                    TZRPOFI_EXP_PDF_LBL_2
+                FROM tzrpofi
+                WHERE tzrpofi_pidm = pin_pidm
+                    AND tzrpofi_docnum_pos = pin_tran_number
+                ORDER BY tzrpofi_activity_date DESC
+            ) LOOP
+                vlc_uuid := i.TZRPOFI_IAC_CDE;
+                vlc_empresa := i.TZRPOFI_EXP_PDF_LBL_1;
+                vlc_motivo_canc := i.TZRPOFI_EXP_PDF_LBL_2;
+                EXIT;
+            END LOOP;
+
+            vlc_objeto_estatus := crea_objeto_estatus_fact(vlc_uuid, vlc_empresa);
+
+            IF (LENGTH(NVL(vlc_objeto_estatus, '')) > 1) THEN
+                -- vlc_envioTralix := envio_tralix('/facturatralix/facturatralix', vlc_objeto_estatus, estatus);   
+                -- Linea TEMPORAL, quitar antes de enviar a PROD.
+                vlc_envioTralix := '[{"uuid": "EEA19FE5-E428-4B8D-BA5B-39462E423BB3", "fecha": "2026-02-12 00:00:00.0","serie": "WS","folio": "28","rfc": "CCM660128HR9","iva": "0.000000","monto": "1.000000","descuento": "0.000000","subtotal": "1.000000","tipoCambio": "1.0000","tipoMoneda": "MXN","idCfd": "d8e6ccc0c345a697a5e61e2557849d89","idSucursal": "40aec84a3811b3d1be3d2cd9763dcc9f","status": "CANCELADO","produccion": true,"fechaCancelacion": "2026-02-12 16:38:16.0","tienePDF": "true"}]';  
+                if NOT(estatus) THEN
+                    vlc_respuesta := 'ERROR AL PEDIR ESTATUS';
+                ELSE
+                    /* Ver si ya está cancelada */
+                    bufferMensaje := fn_limpia_string_error(TO_CHAR(vlc_envioTralix));
+                    bufferMensaje := REPLACE(bufferMensaje, ' ', '');
+
+                    vlc_tagBuscar := '"status":"';
+                    ln_indice := INSTR(bufferMensaje, vlc_tagBuscar);
+                    ln_indFin := INSTR(bufferMensaje, '"', ln_indice + LENGTH(vlc_tagBuscar));
+                    vlc_estatus_Factura := SUBSTR(bufferMensaje, ln_indice + LENGTH(vlc_tagBuscar), 
+                        ln_indFin - (ln_indice + LENGTH(vlc_tagBuscar)));
+
+                    IF (vlc_estatus_Factura = 'CANCELADO') THEN
+                        vlc_tagBuscar := ' - ';
+                        ln_indice := INSTR(bufferMensaje, vlc_tagBuscar);
+                        vlc_motivo_canc := SUBSTR(bufferMensaje, 1, ln_indice - 1);
+
+                        vlc_full_motivo_canc := vlc_motivo_canc;
+                        IF (vlc_motivo_canc = '02') THEN
+                            vlc_full_motivo_canc := vlc_full_motivo_canc || '- Comprobante emitido con errores sin relación.';
+                        ELSIF (vlc_motivo_canc = '03') THEN
+                            vlc_full_motivo_canc := vlc_full_motivo_canc || '- No se llevó a cabo la operación.';
+                        ELSIF (vlc_motivo_canc = '04') THEN
+                            vlc_full_motivo_canc := vlc_full_motivo_canc || '- Operación nominativa relacionada en una factura global.';
+                        END IF;
+
+                        vlc_llamada := tzkrsta.fn_cancelar_factura(pin_pidm, pin_tran_number, vlc_full_motivo_canc);
+                    END IF;
+                END IF;
+            END IF;
+        EXCEPTION
+            WHEN OTHERS THEN
+                vlc_respuesta := sqlerrm;
+        END;
+        RETURN vlc_respuesta;
+    END fn_verifica_cancelacion;
 END TZTRALX;
 /
 show errors;

@@ -137,29 +137,49 @@ WHERE spraddr_pidm = gb_common.f_get_pidm('A00085005')
 
 SELECT *
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085005')
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085011')
+;
+
+SELECT tzrpofi_doc_number, tzrpofi_docnum_pos, tzrpofi_activity_date
+FROM tzrpofi
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085011')
 ;
 
 SELECT *
+FROM goradid
+WHERE goradid_pidm = gb_common.f_get_pidm('A00085011')
+;
+
+UPDATE GORADID
+SET goradid_additional_id = '*IPA220921UB9'
+WHERE goradid_pidm = gb_common.f_get_pidm('A00085011')
+	AND goradid_adid_code = '1RFC'
+;
+
+COMMIT;
+
+SELECT *
 FROM gurdbug
-WHERE gurdbug_parm like '%_ant_%'
-/*    AND gurdbug_value LIKE 'matricula:%'*/
+WHERE gurdbug_parm like '%fn_factura%'
+    --AND gurdbug_value LIKE 'matricula:A00085011%23%'
+	AND gurdbug_date < TO_DATE('2026-FEB-06 23:30:00', 'YYYY-MON-DD HH24:MI:SS')
+	AND gurdbug_date >= TO_DATE('2026-FEB-06 23:28:00', 'YYYY-MON-DD HH24:MI:SS')
 ORDER BY gurdbug_activity_date DESC
 ;
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085005';
-	tran_number NUMBER := 28;
+	matricula VARCHAR2(20 CHAR) := 'A00085011';
+	tran_number NUMBER := 23;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 	tran_original NUMBER := 5;
 	tran_impuestos NUMBER := 0;
-	desc_original VARCHAR2(100 CHAR) := 'Prueba PALOMA Sinaloa';
+	desc_original VARCHAR2(100 CHAR) := '';
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD', 'FAC', 
-		tran_original, tran_impuestos, desc_original);
-	-- vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
+	-- vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD', 'FAC', 
+	-- 	tran_original, tran_impuestos, desc_original);
+	vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
 	IF (vlt_respuesta.errores.COUNT > 0) THEN
@@ -172,10 +192,56 @@ BEGIN
 	END IF;
 END;
 
+SELECT NVL(SUM(tbraccd_amount), 0),
+	MAX(tbraccd_detail_code)
+FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00084606')
+	AND tbraccd_tran_number != 5
+	AND tbraccd_receipt_number = j.tbraccd_receipt_number
+	AND tbraccd_srce_code = 'Z'
+;
+
+SELECT *
+FROM tbrappl
+WHERE tbrappl_pidm = gb_common.f_get_pidm('A00084606')
+	AND (tbrappl_pay_tran_number = 5 OR tbrappl_chg_tran_number = 5)
+;
+
+SELECT tbraccd_tran_number, tbraccd_detail_code, tbraccd_amount,
+	tbraccd_balance, tbraccd_receipt_number, tbraccd_srce_code,
+	TO_CHAR(tbraccd_activity_date, 'YYYY-MON-DD HH24:MI:SS'), tbraccd_user_id
+FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085020')
+	-- AND tbraccd_receipt_number = 522
+	-- AND tbraccd_receipt_number = 5
+ORDER BY tbraccd_activity_date DESC
+;
+
+SELECT tzrpofi_pidm, tzrpofi_docnum_pos
+FROM tzrpofi
+WHERE tzrpofi_sdoc_code = 'PBA'
+	AND tzrpofi_doc_number = '9288'
+;
+
+SELECT *
+FROM spriden
+WHERE spriden_pidm = 105078
+;
+
+SELECT *
+FROM goradid
+WHERE goradid_pidm = gb_common.f_get_pidm('A00085005')
+	AND goradid_adid_code LIKE '%RFC'
+;
+
+UPDATE goradid
+SET gor
+
+
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085016';
-	tran_number NUMBER := 16;
+	matricula VARCHAR2(20 CHAR) := 'A00085005';
+	tran_number NUMBER := 61;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -259,10 +325,10 @@ Where tbraccd_pidm = gb_common.f_get_pidm('A00084933')
 	AND tbraccd_receipt_number = 811
 ;
 
-SELECT * /* tzrpofi_docnum_pos, tzrpofi_doc_number, tzrpofi_iac_cde, 
+SELECT tzrpofi_docnum_pos, tzrpofi_doc_number, tzrpofi_iac_cde /*, 
 	tzrpofi_activity_date - 6/24 */
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00084969')
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085011')
 ;
 
 SELECT *
@@ -370,3 +436,17 @@ WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084985')
 ;
 
 COMMIT;
+
+SELECT * 
+FROM DBA_OBJECTS
+WHERE object_name = 'SMRPRLE_ADD'
+;
+
+SELECT *
+FROM SMRPRLE_ADD
+WHERE descripcion_programa_1 LIKE '%Empr%Ejec%'
+;
+
+SELECT TO_CHAR(sysdate, 'DD-MON-YYYY HH24:MI:SS')
+FROM dual
+;

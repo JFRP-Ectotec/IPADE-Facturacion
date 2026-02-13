@@ -1,0 +1,28 @@
+
+[
+    {
+        "uuid": "EEA19FE5-E428-4B8D-BA5B-39462E423BB3",
+        "fecha": "2026-02-12 00:00:00.0",
+        "serie": "WS",
+        "folio": "28",
+        "rfc": "CCM660128HR9",
+        "iva": "0.000000",
+        "monto": "1.000000",
+        "descuento": "0.000000",
+        "subtotal": "1.000000",
+        "tipoCambio": "1.0000",
+        "tipoMoneda": "MXN",
+        "idCfd": "d8e6ccc0c345a697a5e61e2557849d89",
+        "idSucursal": "40aec84a3811b3d1be3d2cd9763dcc9f",
+        "status": "CANCELADO",
+        "produccion": true,
+        "fechaCancelacion": "2026-02-12 16:38:16.0",
+        "tienePDF": "true",
+        "pedimento": "",
+        "fechaPedimento": "",
+        "aduana": "",
+        "pdfAndXmlDownload": "/6dfcc2bf-734f-4b36-961c-a23f62569870/descargasCfdi?idCfdi=d8e6ccc0c345a697a5e61e2557849d89&produccion=true&representacion=XML_PDF",
+        "pdfDownload": "/6dfcc2bf-734f-4b36-961c-a23f62569870/descargasCfdi?idCfdi=d8e6ccc0c345a697a5e61e2557849d89&produccion=true&representacion=PDF",
+        "xmlDownload": "/6dfcc2bf-734f-4b36-961c-a23f62569870/descargasCfdi?idCfdi=d8e6ccc0c345a697a5e61e2557849d89&produccion=true&representacion=XML"
+    }
+]

@@ -547,7 +547,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
         END LOOP;
 
         FOR m IN (
-            SELECT p.smrprle_program, p.smrprle_program_desc
+            SELECT p.smrprle_program /*, p.smrprle_program_desc*/
             FROM sovlcur s
                 JOIN smrprle p ON (s.sovlcur_program = p.smrprle_program)
             WHERE s.sovlcur_pidm = pidm
@@ -854,9 +854,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
 
         SELF.clave_servicio := '86132000';
         FOR k IN (
-            SELECT p.smrprle_levl_code, p.smrprle_program_desc
+            SELECT p.smrprle_levl_code, p.descripcion_programa_1
             FROM sovlcur s
-                JOIN smrprle p ON (s.sovlcur_program = p.smrprle_program)
+                JOIN smrprle_add p ON (s.sovlcur_program = p.smrprle_program)
             WHERE s.sovlcur_pidm = pidm
                 AND s.sovlcur_active_ind = 'Y'
         ) LOOP
@@ -865,7 +865,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
                 SELF.clave_servicio := '86121702';
             END IF;
 
-            SELF.descripcion := 'Capacitación '||k.smrprle_program_desc;
+            SELF.descripcion := 'Capacitación '||k.descripcion_programa_1;
         END LOOP;
 
         IF NVL(SELF.descripcion, '|') = '|' THEN
@@ -1506,9 +1506,9 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         numLineas := numLineas + 1;
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
 
-        IF (SELF.receptor.esPubGral = 'TRUE') THEN
-            SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;
-        END IF;
+        -- IF (SELF.receptor.esPubGral = 'TRUE') THEN
+        --     SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;
+        -- END IF;
 
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
         numLineas := numLineas + 1;
@@ -1725,6 +1725,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 AND tbraccd_srce_code = 'Z';
 
             /* si hay impuestos */
+            dbms_output.put_line('Impuestos:'||vln_sumaImpuestos);
             IF (vln_sumaImpuestos <= 0) THEN
                 vlb_exento := TRUE;
                 concepto := TY_TRALIX_LINEA_05(pidm, tranNumber);
@@ -1928,13 +1929,13 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         IF (vln_contador = 0) THEN
             -- Buscar el programa
             FOR k IN (
-                SELECT p.smrprle_levl_code, p.smrprle_program_desc
+                SELECT p.smrprle_levl_code, p.descripcion_programa_1
                 FROM sovlcur s
-                    JOIN smrprle p ON (s.sovlcur_program = p.smrprle_program)
+                    JOIN smrprle_add p ON (s.sovlcur_program = p.smrprle_program)
                 WHERE s.sovlcur_pidm = pidm
                     AND s.sovlcur_active_ind = 'Y'
             ) LOOP
-                vlc_descripcion := k.smrprle_program_desc;
+                vlc_descripcion := k.descripcion_programa_1;
             END LOOP;
         END IF;
 
