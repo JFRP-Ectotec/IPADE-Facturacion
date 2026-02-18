@@ -254,10 +254,30 @@ WHERE tvrtsta_pidm = 104669
 
 COMMIT;
 
+SELECT *
+FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085021')
+    AND tvrtsta_tran_number = 8
+;
+
+DELETE 
+FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085021')
+    AND tvrtsta_tran_number = 8
+    AND tvrtsta_tsta_code IN ('PC1', 'CA1')
+;
+
+COMMIT;
+
+SELECT *
+FROM spriden
+WHERE spriden_pidm = 105094
+;
+
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'PUBGRAL1';
-	tran_number NUMBER := 184;
+	matricula VARCHAR2(20 CHAR) := 'A00085021';
+	tran_number NUMBER := 8;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
@@ -360,4 +380,17 @@ BEGIN
 			num_linea := num_linea + 1;
 		END LOOP;
 	END IF;
+END;
+
+SELECT *
+FROM gurdbug
+--WHERE gurdbug_parm LIKE '%canc%' OR gurdubg_parm LIKE '%envio%'
+ORDER BY gurdbug_date desc
+;
+
+
+DECLARE
+BEGIN
+    ln_indice := INSTR(bufferMensaje, vlc_tagBuscar);
+    vlc_motivo_canc := SUBSTR(bufferMensaje, 1, ln_indice - 1);
 END;

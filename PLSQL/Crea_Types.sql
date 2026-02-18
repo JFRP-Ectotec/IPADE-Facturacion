@@ -249,8 +249,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
         ) LOOP
             SELF.totalNum := i.tbraccd_amount;
             SELF.totalLetra := GZKNUMB.monto_escrito(SELF.totalNum);
+            SELF.fecha := i.tbraccd_effective_date;
             -- SELF.fecha := i.tbraccd_effective_date - 6/24;
-            SELF.fecha := SYSDATE - 1;   -- TEMPORAL: Tomar TBRACCD_EFFECTIVE_DATE de la transacción.
+            -- SELF.fecha := SYSDATE - 1;   -- TEMPORAL: Tomar TBRACCD_EFFECTIVE_DATE de la transacción.
         END LOOP;
 
         -- FOR j IN (
@@ -746,17 +747,19 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
             SELF.regimenFiscal := r.goradid_additional_id;
         END LOOP;
 
-        FOR t IN (
-            SELECT g.goradid_additional_id
-            FROM goradid g
-                JOIN spriden s ON (g.goradid_pidm = s.spriden_pidm)
-            WHERE s.spriden_id = 'PUBGRAL' || SELF.numEntidad
-                AND s.spriden_change_ind IS NULL
-                AND g.goradid_adid_code LIKE '%CFD'
-            ORDER BY g.goradid_adid_code DESC
-        ) LOOP
-            SELF.usoCFDI := t.goradid_additional_id;
-        END LOOP;
+        IF (NVL(SELF.usoCFDI, '|') != 'CP01') THEN
+            FOR t IN (
+                SELECT g.goradid_additional_id
+                FROM goradid g
+                    JOIN spriden s ON (g.goradid_pidm = s.spriden_pidm)
+                WHERE s.spriden_id = 'PUBGRAL' || SELF.numEntidad
+                    AND s.spriden_change_ind IS NULL
+                    AND g.goradid_adid_code LIKE '%CFD'
+                ORDER BY g.goradid_adid_code DESC
+            ) LOOP
+                SELF.usoCFDI := t.goradid_additional_id;
+            END LOOP;
+        END IF;
 
         /* TEMPORAL: Hardcodeados por el momento */
         SELF.pais := 'México';

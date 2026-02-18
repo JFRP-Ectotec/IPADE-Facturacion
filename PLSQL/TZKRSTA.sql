@@ -431,9 +431,10 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         vln_tipo_factura := tipo_factura;
         IF (tipo_factura != 'FP') THEN
             vlc_valor := datos_factura.info_gral_comprobante.cfdi;
-            IF (datos_factura.receptor.esPubGral = 'TRUE') THEN
-                vln_tipo_factura := 'FP';
-            END IF;
+            /* TODO: Ver si efectivamente lleva prioridad FP sobre FA */
+            -- IF (datos_factura.receptor.esPubGral = 'TRUE') THEN
+            --     vln_tipo_factura := 'FP';
+            -- END IF;
         ELSE
             vlc_valor := datos_compPago.info_gral_comprobante.cfdi;
             vln_tipo_factura := 'FC';

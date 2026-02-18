@@ -170,10 +170,10 @@ ORDER BY gurdbug_activity_date DESC
 DECLARE
 	datos_banner CLOB;
 	matricula VARCHAR2(20 CHAR) := 'A00085011';
-	tran_number NUMBER := 23;
+	tran_number NUMBER := 8;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 5;
+	tran_original NUMBER := 3;
 	tran_impuestos NUMBER := 0;
 	desc_original VARCHAR2(100 CHAR) := '';
 BEGIN
@@ -449,4 +449,12 @@ WHERE descripcion_programa_1 LIKE '%Empr%Ejec%'
 
 SELECT TO_CHAR(sysdate, 'DD-MON-YYYY HH24:MI:SS')
 FROM dual
+;
+
+
+
+SELECT *
+FROM gurdbug
+WHERE gurdbug_value LIKE '%cula:%A00085021%'
+ORDER BY gurdbug_activity_date DESC
 ;
