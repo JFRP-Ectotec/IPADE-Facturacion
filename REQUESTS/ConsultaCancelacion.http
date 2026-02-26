@@ -1,0 +1,6 @@
+POST https://api-process-poc.azure-api.net/facturacion/v1/consultacancelacion HTTP/1.1
+auth-key: dXNlcl8yMDI1XzAxX2ZhY3Q6V2lVWTdhOFhlNW1BUGdNTjY4U2Y=
+auth-process-key-facturacion: 6d84a847cb564338994f987e895ef220
+Content-Type: application/json
+
+{ "uuid": "2856F418-93E6-46F7-A986-27A59DB6497F" }

@@ -430,10 +430,10 @@ END;
 CREATE OR REPLACE TYPE TY_TRALIX_LINEA_02A UNDER TY_TRALIX_LINEA
 (
     idRelacionado VARCHAR2(100 CHAR),
-    uuid VARCHAR2(10 CHAR),
+    uuid VARCHAR2(50 CHAR),
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_02A(
-        idRelacionado VARCHAR2,
-        uuid VARCHAR2
+        matricula VARCHAR2,
+        tran_number NUMBER
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION tiene_valor RETURN BOOLEAN,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2
@@ -441,8 +441,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_02A UNDER TY_TRALIX_LINEA
 
 CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_02A(
-        idRelacionado VARCHAR2,
-        uuid VARCHAR2
+        matricula VARCHAR2,
+        tran_number NUMBER
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
     BEGIN
@@ -451,15 +451,26 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
 
         SELF.tipo_registro := parent.tipo_registro;
         SELF.sep := parent.sep;
-        -- SELF.fecha := SYSDATE - 1;   -- TEMPORAL: Tomar TBRACCD_EFFECTIVE_DATE de la transacción.
-        SELF.idRelacionado := idRelacionado;      -- Consultar catalogo c_Moneda
-        SELF.uuid := uuid;  -- Consultar catalogo c_MetodoPago
+
+        IF (tran_number > 0) THEN
+            SELF.idRelacionado := 'Nota de Crédito para '||matricula||' en transacción '||TO_CHAR(tran_number);
+            FOR i IN (
+                SELECT tzrpofi_iac_cde
+                FROM tzrpofi
+                WHERE tzrpofi_pidm = gb_common.f_get_pidm(matricula)
+                ORDER BY tzrpofi_activity_date DESC
+            ) LOOP
+                SELF.uuid := i.tzrpofi_iac_cde;
+                EXIT;    
+            END LOOP;
+        END IF;
+        
         RETURN;
     END TY_TRALIX_LINEA_02A;
 
     MEMBER FUNCTION tiene_valor RETURN BOOLEAN IS
     BEGIN
-        RETURN (NVL(SELF.idRelacionado, '|') != '|');
+        RETURN (NVL(SELF.uuid, '|') != '|');
     END tiene_valor;
 
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
@@ -1431,6 +1442,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
     errores TY_TRALIX_ARR_ERROR,
     estatus_debug  VARCHAR2(1 CHAR), --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
 	raiz_debug     VARCHAR2(100 CHAR),
+    tipo_factura   VARCHAR2(10 CHAR),
     /* TODO: Agregar en este constructor si se va a enviar a PubGral o no */
     CONSTRUCTOR FUNCTION TY_TRALIX_FACTURA(
         matricula VARCHAR2,
@@ -1478,21 +1490,15 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         impRetenidos NUMBER := 0;
         impTrasladados NUMBER := 0;
         cObjetoImp VARCHAR2(2 CHAR) := '01';
-        -- vlc_camp_code stvcamp.stvcamp_dicd_code%TYPE;
         vln_pidm_entidad_fiscal SPRIDEN.SPRIDEN_PIDM%TYPE;
         vlc_nombreArchivo VARCHAR2(100 CHAR);
         vln_pidm SPRIDEN.SPRIDEN_PIDM%TYPE;
         vln_contador NUMBER;
-        -- concImpTrasRow TY_TRALIX_LINEA_05C;
-
-        -- tranPagada TBRAPPL.tbrappl_chg_tran_number%TYPE;
-        -- vln_sumaImpuestos NUMBER := 0;
-        -- vlb_exento BOOLEAN;
-        -- vln_subTotal TBRACCD.TBRACCD_AMOUNT%TYPE;
-        -- vlc_detalleImp TBRACCD.TBRACCD_DETAIL_CODE%TYPE;
+    
     BEGIN
         SELF.estatus_debug := 'I';
         SELF.raiz_debug := 'Linea_factura';
+        SELF.tipo_factura := procesoFactura;
 
         vlc_nombreArchivo := matricula || '_' || tranNumber || '.txt';
         SELF.inicio_archivo := ty_tralix_linea_00(vlc_nombreArchivo);
@@ -1516,8 +1522,11 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
         numLineas := numLineas + 1;
 
-        SELF.info_sustitucion := TY_TRALIX_LINEA_02('', '');
-        SELF.info_sust_detalle := TY_TRALIX_LINEA_02A('', '');
+        -- SELF.info_sustitucion := TY_TRALIX_LINEA_02('', '');
+        SELF.info_sust_detalle := TY_TRALIX_LINEA_02A(matricula, tranOriginalAntic);
+        IF (procesoFactura = 'NDC' AND SELF.info_sust_detalle.tiene_valor) THEN
+            numLineas := numLineas + 1;
+        END IF;
 
         SELF.conceptos := TY_TRALIX_ARR_05();
         SELF.concImpTras := TY_TRALIX_ARR_05C();
@@ -1551,9 +1560,9 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         vlc_respuesta := SELF.inicio_archivo.imprimir_linea || '|' ||
             SELF.info_gral_comprobante.imprimir_linea;
 
-        IF (SELF.info_sustitucion.tiene_valor) THEN
+        IF (SELF.tipo_factura = 'NDC' AND SELF.info_sust_detalle.tiene_valor) THEN
             vlc_respuesta := vlc_respuesta || '|' ||
-                SELF.info_sustitucion.imprimir_linea || '|' ||
+                -- SELF.info_sustitucion.imprimir_linea || '|' ||
                 SELF.info_sust_detalle.imprimir_linea
             ;
         END IF;
@@ -1938,7 +1947,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 WHERE s.sovlcur_pidm = pidm
                     AND s.sovlcur_active_ind = 'Y'
             ) LOOP
-                vlc_descripcion := k.descripcion_programa_1;
+                vlc_descripcion := 'Capacitación ' || k.descripcion_programa_1;
             END LOOP;
         END IF;
 

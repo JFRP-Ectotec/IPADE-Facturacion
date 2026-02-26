@@ -1,0 +1,8 @@
+POST /facturacion/v1/cancelaCFDI HTTP/1.1
+Host: api-process-poc.azure-api.net
+auth-key: dXNlcl8yMDI1XzAxX2ZhY3Q6V2lVWTdhOFhlNW1BUGdNTjY4U2Y=
+auth-process-key-facturacion: 6d84a847cb564338994f987e895ef220
+Content-Type: application/json
+Content-Length: 124
+
+{"idEmpresa": "472529fa-1b6a-42b5-bb99-15f19feff522" ,"motivo": "01" ,"uuid":[ "2856F418-93E6-46F7-A986-27A59DB6497F" ]}
