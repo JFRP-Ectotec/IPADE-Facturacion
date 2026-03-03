@@ -746,9 +746,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         IF ((SELF.receptor.esPubGral = 'TRUE') AND (SELF.conceptos.COUNT > 0)) THEN
             FOR i IN SELF.conceptos.FIRST .. SELF.conceptos.LAST
             LOOP
-                SELF.conceptos(i).clave_Servicio := '01010101';
+                -- SELF.conceptos(i).clave_Servicio := '01010101';
                 SELF.conceptos(i).claveUnidad := 'ACT';
-                SELF.conceptos(i).descripcion := 'PÚBLICO EN GENERAL';
+                -- SELF.conceptos(i).descripcion := 'PÚBLICO EN GENERAL';
             END LOOP;
         END IF;
     END ajustar_pubgral;

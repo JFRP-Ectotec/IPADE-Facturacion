@@ -433,7 +433,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_02A UNDER TY_TRALIX_LINEA
     uuid VARCHAR2(50 CHAR),
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_02A(
         matricula VARCHAR2,
-        tran_number NUMBER
+        tran_number NUMBER,
+        idRelacionado VARCHAR2
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION tiene_valor RETURN BOOLEAN,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2
@@ -442,7 +443,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_02A UNDER TY_TRALIX_LINEA
 CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_02A(
         matricula VARCHAR2,
-        tran_number NUMBER
+        tran_number NUMBER,
+        idRelacionado VARCHAR2
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
     BEGIN
@@ -450,16 +452,24 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
         parent.INIT('02A');
 
         SELF.tipo_registro := parent.tipo_registro;
+        SELF.idRelacionado := idRelacionado;
         SELF.sep := parent.sep;
 
+        dbms_output.put_line('matricula:'||matricula||' tranNumber:'||tran_number);
+
         IF (tran_number > 0) THEN
-            SELF.idRelacionado := 'Nota de Crédito para '||matricula||' en transacción '||TO_CHAR(tran_number);
+            -- SELF.idRelacionado := 'Nota de Crédito para '||matricula||' en transacción '||TO_CHAR(tran_number);
+            -- IF (proceso = 'FST') THEN
+            --     SELF.idRelacionado := 'Factura que sustituirá';
+            -- END IF;
             FOR i IN (
                 SELECT tzrpofi_iac_cde
                 FROM tzrpofi
                 WHERE tzrpofi_pidm = gb_common.f_get_pidm(matricula)
+                    AND tzrpofi_docnum_pos = tran_number
                 ORDER BY tzrpofi_activity_date DESC
             ) LOOP
+                dbms_output.put_line('UUID:'||i.tzrpofi_iac_cde);
                 SELF.uuid := i.tzrpofi_iac_cde;
                 EXIT;    
             END LOOP;
@@ -1454,7 +1464,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
         procesoFactura VARCHAR2,
         tranOriginalAntic NUMBER,
         tranFantImpuestos NUMBER,
-        adicional VARCHAR2
+        adicional VARCHAR2,
+        matriculaOriginal VARCHAR2
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
     MEMBER PROCEDURE ajustar_pubgral,
@@ -1480,7 +1491,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         procesoFactura VARCHAR2,
         tranOriginalAntic NUMBER,
         tranFantImpuestos NUMBER,
-        adicional VARCHAR2
+        adicional VARCHAR2,
+        matriculaOriginal VARCHAR2
     ) RETURN SELF AS RESULT IS
         concepto TY_TRALIX_LINEA_05;
         -- impuestoTras TY_TRALIX_LINEA_06;
@@ -1494,6 +1506,9 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         vlc_nombreArchivo VARCHAR2(100 CHAR);
         vln_pidm SPRIDEN.SPRIDEN_PIDM%TYPE;
         vln_contador NUMBER;
+        matricula_sust SPRIDEN.SPRIDEN_ID%TYPE;
+        relacionDoctos VARCHAR2(100 CHAR);
+        tipoRelacionDocto VARCHAR2(10 CHAR);
     
     BEGIN
         SELF.estatus_debug := 'I';
@@ -1522,10 +1537,27 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
         numLineas := numLineas + 1;
 
-        -- SELF.info_sustitucion := TY_TRALIX_LINEA_02('', '');
-        SELF.info_sust_detalle := TY_TRALIX_LINEA_02A(matricula, tranOriginalAntic);
-        IF (procesoFactura = 'NDC' AND SELF.info_sust_detalle.tiene_valor) THEN
-            numLineas := numLineas + 1;
+        dbms_output.put_line('Proceso Factura:'||procesoFactura);
+        IF (procesoFactura IN ('NDC', 'FST')) THEN
+            relacionDoctos := 'Nota de Crédito para '||matricula||' en transacción '||TO_CHAR(tranOriginalAntic);
+            tipoRelacionDocto := '01';
+            IF (procesoFactura = 'FST') THEN
+                relacionDoctos := 'Factura que sustituirá';
+                tipoRelacionDocto := '04';
+            END IF;
+
+            SELF.info_sustitucion := TY_TRALIX_LINEA_02(relacionDoctos, tipoRelacionDocto);
+            IF (SELF.info_sustitucion.tiene_valor) THEN
+                numLineas := numLineas + 1;
+                matricula_sust := matricula;
+                IF (procesoFactura = 'FST') THEN
+                    matricula_sust := matriculaOriginal;
+                END IF;
+                SELF.info_sust_detalle := TY_TRALIX_LINEA_02A(matricula_sust, tranOriginalAntic, relacionDoctos);
+                IF (SELF.info_sust_detalle.tiene_valor) THEN
+                    numLineas := numLineas + 1;
+                END IF;
+            END IF;
         END IF;
 
         SELF.conceptos := TY_TRALIX_ARR_05();
@@ -1562,8 +1594,15 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
         IF (SELF.tipo_factura = 'NDC' AND SELF.info_sust_detalle.tiene_valor) THEN
             vlc_respuesta := vlc_respuesta || '|' ||
-                -- SELF.info_sustitucion.imprimir_linea || '|' ||
-                SELF.info_sust_detalle.imprimir_linea
+            SELF.info_sust_detalle.imprimir_linea
+            ;
+        END IF;
+
+        IF (SELF.tipo_factura = 'FST' AND SELF.info_sustitucion.tiene_valor
+            AND SELF.info_sust_detalle.tiene_valor) THEN
+            vlc_respuesta := vlc_respuesta || '|' ||
+            SELF.info_sustitucion.imprimir_linea || '|' ||
+            SELF.info_sust_detalle.imprimir_linea
             ;
         END IF;
             

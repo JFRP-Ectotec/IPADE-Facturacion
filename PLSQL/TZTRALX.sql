@@ -87,6 +87,18 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
+    FUNCTION fn_factsust_tralix(
+        matricula IN VARCHAR2,
+        tran_number IN NUMBER,
+        tipo_pago_banner IN VARCHAR2 DEFAULT '99',
+        tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE',  /* Valores válidos 'PUE', 'PPD' */
+        etiqueta IN VARCHAR2 DEFAULT 'FAC',
+        matricula_original IN VARCHAR2,
+        tran_number_original IN NUMBER,
+        tran_impuestos_orig IN NUMBER,
+        data_origin IN VARCHAR2 DEFAULT 'LOCAL')
+        RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
+
     separador constant varchar2(1) := '|';
 
     FUNCTION existe_factura(
@@ -600,6 +612,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tran_number_orig_ant IN NUMBER DEFAULT 0,
         tran_number_imp IN NUMBER DEFAULT 0,
         desc_adicional IN VARCHAR2 DEFAULT '',
+        matricula_orig_ant IN VARCHAR2 DEFAULT '',
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')   -- DEF = Default, ANT = Anticipada, CP = Complemento de Pago
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlc_respuesta CLOB;
@@ -643,7 +656,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlc_programa_buscar VARCHAR2(100 CHAR);
     BEGIN
         pr_registrar_debug('fn_factura_base', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number||' tipo_pago_banner:'||
-            tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar||' proceso_factura:'||proceso_factura
+            tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar||' proceso_factura:'||proceso_factura||' mat_orig_ant:'||matricula_orig_ant
             ||' tran_number_orig_ant:'||tran_number_orig_ant||' tran_number_imp:'||tran_number_imp
             ||' desc_adicional:'||desc_adicional);
 
@@ -777,7 +790,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
             datosFactura := ty_tralix_factura(matricula, tran_number, vlc_num_entidad, 
                 1, vlc_tipo_pago_banner, tipo_pago_facturar, proceso_factura,
-                tran_number_orig_ant, tran_number_imp, desc_adicional);       
+                tran_number_orig_ant, tran_number_imp, desc_adicional, matricula_orig_ant);       
 
             datosFactura.validar;
             IF (datosFactura.errores.COUNT > 0) THEN
@@ -1060,7 +1073,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar);
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
-            NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'DEF', 0, 0);
+            NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'DEF', 0, 0,
+            '', '', data_origin);
     END fn_factura_tralix;
 
     FUNCTION fn_factura_tralix_json(
@@ -1473,7 +1487,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
             NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'ANT', tran_number_original, 
-            tran_number_imp, desc_adicional);
+            tran_number_imp, desc_adicional, '', data_origin);
     END fn_factura_ant_tralix;
 
     FUNCTION fn_factura_cp_tralix(
@@ -1489,7 +1503,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             ||' tipo_pago_banner:'||tipo_pago_banner||' etiqueta:'||etiqueta);
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
-            'PPD', NVL(etiqueta, 'FAC'), 'CP', 0, 0);
+            'PPD', NVL(etiqueta, 'FAC'), 'CP', 0, 0, '', '', data_origin);
     END fn_factura_cp_tralix;
 
     FUNCTION fn_notacred_tralix(
@@ -1509,8 +1523,31 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
             NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'NDC', tran_number_original, 
-            0, '');
+            0, '', '', data_origin);
     END fn_notacred_tralix;
+
+    FUNCTION fn_factsust_tralix(
+        matricula IN VARCHAR2,
+        tran_number IN NUMBER,
+        tipo_pago_banner IN VARCHAR2 DEFAULT '99',
+        tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE',  /* Valores válidos 'PUE', 'PPD' */
+        etiqueta IN VARCHAR2 DEFAULT 'FAC',
+        matricula_original IN VARCHAR2,
+        tran_number_original IN NUMBER,
+        tran_impuestos_orig IN NUMBER,
+        data_origin IN VARCHAR2 DEFAULT 'LOCAL')
+        RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
+        vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
+    BEGIN
+        pr_registrar_debug('fn_factsust_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
+            ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar
+            ||' matricula_original:'||matricula_original||' tran_number_original:'||tran_number_original
+            ||' tran_impuestos_orig:'||tran_impuestos_orig);
+
+        RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
+            NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'FST', tran_number_original, 
+            tran_impuestos_orig, '', matricula_original, data_origin);
+    END fn_factsust_tralix;
 
     FUNCTION existe_factura(
         pin_pidm IN NUMBER,
@@ -1640,6 +1677,19 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 vlc_respuesta := 'FA';
                 -- pr_registrar_debug('tipo_proceso_tralix', 'Factura anticipada');
                 RETURN vlc_respuesta;
+            ELSE
+                FOR j IN (
+                    SELECT DISTINCT tbrappl_pay_tran_number
+                    FROM tbrappl
+                    WHERE tbrappl_pidm = pin_pidm
+                        AND tbrappl_chg_tran_number = pin_tran_number
+                ) LOOP
+                    IF (transaccion_es_fa(pin_pidm, j.tbrappl_pay_tran_number)) THEN
+                        vlc_respuesta := 'FP';
+                        -- pr_registrar_debug('tipo_proceso_tralix', 'Factura anticipada');
+                        RETURN vlc_respuesta;
+                    END IF;
+                END LOOP;
             END IF;
 
             -- Buscar todas las transacciones relacionadas con esta 
