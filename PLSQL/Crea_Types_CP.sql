@@ -602,7 +602,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         END IF;
         
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, 
-            numEntidad, difEmpresa, metodoPago, formaPago);
+            numEntidad, difEmpresa, metodoPago, formaPago, 'XXX');
         SELF.info_gral_comprobante.metodoPago := '';
         SELF.info_gral_comprobante.formaPago := '';
         SELF.info_gral_comprobante.tipoComprobante := 'P';
@@ -658,7 +658,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             --     AND tbraccd_receipt_number = j.tbraccd_receipt_number
             --     AND tbraccd_srce_code = 'Z';
 
-            concepto := TY_TRALIX_LINEA_05(vln_pidm, tranNumber);
+            concepto := TY_TRALIX_LINEA_05(vln_pidm, tranNumber, 'XXX');
             concepto.clave_servicio := '84111506';
             concepto.descripcion := 'Pago';
             concepto.valorUnitario := 0;

@@ -251,12 +251,18 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         gokjson.initialize_clob_output;
         gokjson.open_object(NULL);
 
-        gokjson.write('uuid', pic_uuid);
+        gokjson.open_array('uuid');
+        gokjson.write('X2', pic_uuid);
+        gokjson.close_array;
+
         gokjson.write('idEmpresa', pic_empresa);
-        
+
         gokjson.close_object;
         vlc_respuesta := gokjson.get_clob_output;
 	    gokjson.free_output;
+
+        vlc_respuesta := REPLACE(vlc_respuesta, '"X2":', '');
+
         RETURN vlc_respuesta;
     END crea_objeto_conscanc_fact;
 
@@ -898,7 +904,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         -- IF (vlt_respuesta.estatus = 'ERROR') THEN
         --     RETURN vlt_respuesta;
         -- END IF;
-
+        
         vlc_envioTralix := envio_factura_tralix(vlc_objeto_principal, vlb_estatusEnvio);
         vln_monto := 0;
 
@@ -1029,6 +1035,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 
                 IF (proceso_factura = 'ANT' /* AND vlc_tipoFactura_TSTA != 'FC'*/ ) THEN
                     vlc_tipoFactura_TSTA := 'FA';
+                ELSIF (proceso_factura = 'NDC') THEN
+                    vlc_tipoFactura_TSTA := 'NC';
                 ELSIF (proceso_factura = 'CP') THEN
                     vlc_tipoFactura_TSTA := 'FP';
                 END IF;
@@ -1593,13 +1601,13 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         WHERE t1.tvrtsta_pidm = pin_pidm
             AND t1.tvrtsta_tran_number = pin_tran_number
             AND t1.tvrtsta_dloc_code = 'FA'
-            AND t1.tvrtsta_tsta_code =
+            AND t1.tvrtsta_tsta_code LIKE 'T0%' /*=
             (SELECT MAX(t2.tvrtsta_tsta_code)
             FROM tvrtsta t2
             WHERE t2.tvrtsta_pidm = t1.tvrtsta_pidm
                 AND t2.tvrtsta_tran_number = t1.tvrtsta_tran_number
                 AND t2.tvrtsta_tsta_code LIKE 'T0%' 
-            )
+            ) */
         ;
 
         IF (vln_contador > 0) THEN
@@ -1609,13 +1617,13 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             WHERE t1.tvrtsta_pidm = pin_pidm
                 AND t1.tvrtsta_tran_number = pin_tran_number
                 AND t1.tvrtsta_dloc_code = 'PPD'
-                AND t1.tvrtsta_tsta_code =
+                AND t1.tvrtsta_tsta_code LIKE 'F0%' /* =
                 (SELECT MAX(t2.tvrtsta_tsta_code)
                 FROM tvrtsta t2
                 WHERE t2.tvrtsta_pidm = t1.tvrtsta_pidm
                     AND t2.tvrtsta_tran_number = t1.tvrtsta_tran_number
                     AND t2.tvrtsta_tsta_code LIKE 'F0%' 
-                )
+                ) */
             ;
 
             vlb_respuesta := (vln_contador > 0);
@@ -1804,6 +1812,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 EXIT;
             END LOOP;
 
+            pr_registrar_debug('fn_verifica_cancelacion','uuid:'||vlc_uuid);
             -- vlc_objeto_estatus := crea_objeto_estatus_fact(vlc_uuid, vlc_empresa);
             
             IF (LENGTH(NVL(vlc_uuid, '')) > 1) THEN

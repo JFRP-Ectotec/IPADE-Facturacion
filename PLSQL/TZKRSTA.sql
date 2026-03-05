@@ -31,7 +31,7 @@ END TZKRSTA;
 show errors;
 
 CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
-    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'A'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'I'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
 	cgc_raiz_debug        CONSTANT VARCHAR2(100) := 'TZKRSTA-';
 
     PROCEDURE pr_registrar_debug (
@@ -101,6 +101,10 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
             IF (vln_respuesta > 2) THEN
                 vln_respuesta := 2;
             END IF;
+        END IF;
+
+        IF (inicio_codigo IN ('NC')) THEN
+            vln_respuesta := 1;
         END IF;
 
         vlc_respuesta := TRIM(TO_CHAR(vln_respuesta, vlc_formato));
@@ -213,17 +217,44 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         vlc_seqCodigo VARCHAR2(2 CHAR);
         codigo tvrtsta.TVRTSTA_TSTA_CODE%TYPE;
         -- registro TY_TRALIX_TSTA_OBJ;
+        sdoc_inicial VARCHAR2(2 CHAR);
+        vln_numNDC NUMBER;
     BEGIN
         pr_registrar_debug('fn_registrar_tipo_factura','tipoFactura:'||tipo_transaccion);
 
-        IF (tipo_transaccion NOT IN ('FA', 'FC', 'FP')) THEN
+        IF (tipo_transaccion NOT IN ('FA', 'FC', 'FP', 'NC')) THEN
             RETURN 'Tipo de factura no válida';
         END IF;
 
-        vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, 'T'); 
-        codigo := 'T'||vlc_seqCodigo;
-        pr_registrar_debug('fn_registrar',codigo||' - '||numFactura);
-        pr_registrar_tvsta(codigo, tipo_transaccion, numFactura, registros);
+        IF (tipo_transaccion != 'NC') THEN
+            sdoc_inicial := 'T';
+            vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, sdoc_inicial); 
+            codigo := sdoc_inicial||vlc_seqCodigo;
+            pr_registrar_debug('fn_registrar',codigo||' - '||numFactura);
+            pr_registrar_tvsta(codigo, tipo_transaccion, numFactura, registros);
+        ELSE
+            sdoc_inicial := 'NC';
+            vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, sdoc_inicial); 
+            codigo := sdoc_inicial||vlc_seqCodigo;
+
+            FOR j IN (
+                SELECT TVRSDSQ_MAX_SEQ + 1 as secuencial
+                FROM TVRSDSQ t
+                WHERE TVRSDSQ_SDOC_CODE = 'NDC'
+                FOR UPDATE
+            )
+            LOOP
+                vln_numNDC := j.secuencial;
+            END LOOP;
+
+            UPDATE tvrsdsq
+            SET TVRSDSQ_MAX_SEQ = vln_numNDC
+            WHERE TVRSDSQ_SDOC_CODE = 'NDC'; 
+            
+            pr_registrar_tvsta(codigo, '', 'NDC-'||TRIM(TO_CHAR(vln_numNDC, '00000')), registros);
+        END IF;
+        
+        -- COMMIT;
 
         RETURN 'OP_EXITOSA';
     EXCEPTION
