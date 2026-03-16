@@ -31,7 +31,7 @@ END TZKRSTA;
 show errors;
 
 CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
-    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'I'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
+    cgc_estatus_debug     CONSTANT VARCHAR2(1) := 'A'; --Estatus de debug en GURDBUG D debug, O Output, A Ambos, I Inactivo
 	cgc_raiz_debug        CONSTANT VARCHAR2(100) := 'TZKRSTA-';
 
     PROCEDURE pr_registrar_debug (
@@ -616,6 +616,8 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         vlc_valor tvrtsta.tvrtsta_comments%TYPE;
         vlc_dloc_code TVRTSTA.TVRTSTA_DLOC_CODE%TYPE := '';
     BEGIN
+        pr_registrar_debug('fn_cancelar_factura', 'pidm:'||pidm || ' - tranNumber: ' || tran_number
+            ||' - motivoSust: '||motivo_sust);
         registros := TY_TRALIX_TSTA_ARR();
         vlc_codigo := 'CA';
         vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, vlc_codigo);
@@ -623,7 +625,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         -- vlc_valor := motivo_sust;
 
         FOR j IN (
-            SELECT tvrtsta_comments
+            SELECT tvrtsta_comments, tvrtsta_dloc_code
             FROM tvrtsta
             WHERE tvrtsta_pidm = pidm
                 AND tvrtsta_tran_number = tran_number
@@ -632,16 +634,17 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
                 tvrtsta_activity_date DESC
         ) LOOP
             vlc_valor := j.tvrtsta_comments;
+            vlc_dloc_code := j.tvrtsta_dloc_code;
             EXIT;
         END LOOP;
 
-        FOR i IN (
-            SELECT tvvdloc_code
-            FROM tvvdloc
-            WHERE tvvdloc_code = motivo_sust
-        ) LOOP
-            vlc_dloc_code := i.tvvdloc_code;
-        END LOOP;
+        -- FOR i IN (
+        --     SELECT tvvdloc_code
+        --     FROM tvvdloc
+        --     WHERE tvvdloc_code = motivo_sust
+        -- ) LOOP
+        --     vlc_dloc_code := i.tvvdloc_code;
+        -- END LOOP;
 
         pr_registrar_tvsta(vlc_codigo, vlc_dloc_code, vlc_valor, registros);
 

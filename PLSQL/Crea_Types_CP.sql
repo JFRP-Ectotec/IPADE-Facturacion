@@ -26,8 +26,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_COMPPAGOS UNDER TY_TRALIX_LINEA
         idPagos VARCHAR2,
         formaPago VARCHAR2
     ) RETURN SELF AS RESULT,
-    MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
-    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2) /*,
+    MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 /*,
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2),
     MEMBER PROCEDURE validar */
 );
 
@@ -101,23 +101,23 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep ||
-            SELF.idPagos || SELF.sep ||
-            SELF.versionLinea || SELF.sep ||
+            SELF.sanitizar(SELF.idPagos) || SELF.sep ||
+            SELF.sanitizar(SELF.versionLinea) || SELF.sep ||
             SELF.format_fecha(SELF.FechaPago) || SELF.sep ||
-            SELF.FormaPagoP || SELF.sep ||
-            SELF.MonedaP || SELF.sep ||
-            SELF.TipoCambioP || SELF.sep ||
+            SELF.sanitizar(SELF.FormaPagoP) || SELF.sep ||
+            SELF.sanitizar(SELF.MonedaP) || SELF.sep ||
+            TO_CHAR(SELF.TipoCambioP) || SELF.sep ||
             SELF.format_moneda(SELF.Monto) || SELF.sep ||
-            SELF.NumOperacion || SELF.sep ||
-            SELF.RfcEmisorCtaOrd || SELF.sep ||
-            SELF.NomBancoOrdExt || SELF.sep ||
-            SELF.CtaOrdenante || SELF.sep ||
-            SELF.RfcEmisorCtaBen || SELF.sep ||
-            SELF.CtaBeneficiario || SELF.sep ||
-            SELF.TipoCadPago || SELF.sep ||
-            SELF.CertPago || SELF.sep ||
-            SELF.CadPago || SELF.sep ||
-            SELF.SelloPago
+            SELF.sanitizar(SELF.NumOperacion) || SELF.sep ||
+            SELF.sanitizar(SELF.RfcEmisorCtaOrd) || SELF.sep ||
+            SELF.sanitizar(SELF.NomBancoOrdExt) || SELF.sep ||
+            SELF.sanitizar(SELF.CtaOrdenante) || SELF.sep ||
+            SELF.sanitizar(SELF.RfcEmisorCtaBen) || SELF.sep ||
+            SELF.sanitizar(SELF.CtaBeneficiario) || SELF.sep ||
+            SELF.sanitizar(SELF.TipoCadPago) || SELF.sep ||
+            SELF.sanitizar(SELF.CertPago) || SELF.sep ||
+            SELF.sanitizar(SELF.CadPago) || SELF.sep ||
+            SELF.sanitizar(SELF.SelloPago)
         ;
     END imprimir_linea;
 
@@ -396,18 +396,18 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep ||
-            SELF.idPagos || SELF.sep ||
-            SELF.uuidPagoOriginal || SELF.sep ||
-            SELF.serie || SELF.sep ||
-            SELF.folio || SELF.sep ||
-            SELF.monedaDR || SELF.sep ||
+            SELF.sanitizar(SELF.idPagos) || SELF.sep ||
+            SELF.sanitizar(SELF.uuidPagoOriginal) || SELF.sep ||
+            SELF.sanitizar(SELF.serie) || SELF.sep ||
+            SELF.sanitizar(SELF.folio) || SELF.sep ||
+            SELF.sanitizar(SELF.monedaDR) || SELF.sep ||
             SELF.equivalenciaDR || SELF.sep ||
             SELF.numParcialidad || SELF.sep ||
             SELF.format_moneda(SELF.impSaldoAnt) || SELF.sep ||
             SELF.format_moneda(SELF.impPagado) || SELF.sep ||
             SELF.format_moneda(SELF.impSaldoInsoluto) || SELF.sep ||
-            SELF.objetoImpDR || SELF.sep ||
-            SELF.idImpuestoDR 
+            SELF.sanitizar(SELF.objetoImpDR) || SELF.sep ||
+            SELF.sanitizar(SELF.idImpuestoDR) 
         ;
     END imprimir_linea;
 
@@ -480,10 +480,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_IMP_CP AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep ||
-            SELF.idPagos || SELF.sep ||
+            SELF.sanitizar(SELF.idPagos) || SELF.sep ||
             SELF.format_moneda(SELF.baseDR) || SELF.sep ||
-            SELF.impuestoDR || SELF.sep ||
-            SELF.tipoFactorDR || SELF.sep ||
+            SELF.sanitizar(SELF.impuestoDR) || SELF.sep ||
+            SELF.sanitizar(SELF.tipoFactorDR) || SELF.sep ||
             TRIM(TO_CHAR(SELF.tasaCuotaDR, '0.009999')) || SELF.sep ||
             SELF.format_moneda(SELF.importeDR)
         ;

@@ -37,7 +37,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA AS OBJECT
     MEMBER FUNCTION FORMAT_MONEDA(pin_cantidad NUMBER) RETURN VARCHAR2,
     MEMBER PROCEDURE INIT_ERRORES,
     MEMBER PROCEDURE AGREGAR_ERROR(pic_mensaje VARCHAR2),
-    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2)
+    MEMBER PROCEDURE REGISTRAR_DEBUG(pic_procedimiento VARCHAR2, pic_texto VARCHAR2),
+    MEMBER FUNCTION SANITIZAR(pic_palabra VARCHAR2) RETURN VARCHAR2
 ) NOT FINAL INSTANTIABLE;
 
 CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA AS
@@ -98,6 +99,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA AS
 		WHEN OTHERS THEN
 			NULL;
     END REGISTRAR_DEBUG;
+
+    MEMBER FUNCTION SANITIZAR(pic_palabra VARCHAR2) RETURN VARCHAR2 IS
+    BEGIN
+        RETURN translate(pic_palabra, chr(10) || chr(13) || chr(09) || '|', '');
+    END SANITIZAR;
 END;
 
 -----------
@@ -303,8 +309,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep ||
             SELF.cfdi || SELF.sep ||
-            SELF.serie || SELF.sep ||
-            SELF.folio || SELF.sep ||
+            SELF.sanitizar(SELF.serie) || SELF.sep ||
+            SELF.sanitizar(SELF.folio) || SELF.sep ||
             SELF.format_fecha(SELF.fecha) || SELF.sep ||
             SELF.format_moneda(SELF.subTotalNum) || SELF.sep ||
             SELF.format_moneda(SELF.totalNum) || SELF.sep ||
@@ -312,22 +318,22 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
             TRIM(TO_CHAR(SELF.taxesTrasladados, '9999999990.00')) || SELF.sep ||
             SELF.format_moneda(SELF.taxesRetenidos) || SELF.sep ||
             SELF.format_moneda(SELF.descuento) || SELF.sep ||
-            SELF.motivoDescuento || SELF.sep ||
+            SELF.sanitizar(SELF.motivoDescuento) || SELF.sep ||
             SELF.totalLetra || SELF.sep ||
             SELF.moneda || SELF.sep ||
             SELF.tipoCambio || SELF.sep ||
             SELF.referencia || SELF.sep ||
-            SELF.nota1 || SELF.sep ||
-            SELF.nota2 || SELF.sep ||
-            SELF.nota3 || SELF.sep ||
-            SELF.tipoComprobante || SELF.sep ||
-            SELF.metodoPago || SELF.sep ||
-            SELF.lugarExpedicion || SELF.sep ||
-            SELF.confirmacion || SELF.sep ||
-            SELF.formaPago || SELF.sep ||
-            SELF.condicionesPago || SELF.sep ||
-            SELF.exportacion || SELF.sep ||
-            SELF.facAtrAdquirente
+            SELF.sanitizar(SELF.nota1) || SELF.sep ||
+            SELF.sanitizar(SELF.nota2) || SELF.sep ||
+            SELF.sanitizar(SELF.nota3) || SELF.sep ||
+            SELF.sanitizar(SELF.tipoComprobante) || SELF.sep ||
+            SELF.sanitizar(SELF.metodoPago) || SELF.sep ||
+            SELF.sanitizar(SELF.lugarExpedicion) || SELF.sep ||
+            SELF.sanitizar(SELF.confirmacion) || SELF.sep ||
+            SELF.sanitizar(SELF.formaPago) || SELF.sep ||
+            SELF.sanitizar(SELF.condicionesPago) || SELF.sep ||
+            SELF.sanitizar(SELF.exportacion) || SELF.sep ||
+            SELF.sanitizar(SELF.facAtrAdquirente)
         ;
     END imprimir_linea;
 
@@ -425,8 +431,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02 AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep ||
-            SELF.idRelacionado || SELF.sep ||
-            SELF.tipoRelacion
+            SELF.sanitizar(SELF.idRelacionado) || SELF.sep ||
+            SELF.sanitizar(SELF.tipoRelacion)
         ;
     END imprimir_linea;
 END;
@@ -463,8 +469,6 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
         SELF.idRelacionado := idRelacionado;
         SELF.sep := parent.sep;
 
-        dbms_output.put_line('matricula:'||matricula||' tranNumber:'||tran_number);
-
         IF (tran_number > 0) THEN
             -- SELF.idRelacionado := 'Nota de Crédito para '||matricula||' en transacción '||TO_CHAR(tran_number);
             -- IF (proceso = 'FST') THEN
@@ -477,7 +481,6 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
                     AND tzrpofi_docnum_pos = tran_number
                 ORDER BY tzrpofi_activity_date DESC
             ) LOOP
-                dbms_output.put_line('UUID:'||i.tzrpofi_iac_cde);
                 SELF.uuid := i.tzrpofi_iac_cde;
                 EXIT;    
             END LOOP;
@@ -494,8 +497,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_02A AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep ||
-            SELF.idRelacionado || SELF.sep ||
-            SELF.uuid
+            SELF.sanitizar(SELF.idRelacionado) || SELF.sep ||
+            SELF.sanitizar(SELF.uuid)
         ;
     END imprimir_linea;
 END;
@@ -714,26 +717,26 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep ||
-            SELF.identificador || SELF.sep ||
-            SELF.rfc || SELF.sep ||
-            SELF.nombre || SELF.sep ||
-            SELF.pais || SELF.sep ||
-            SELF.calle || SELF.sep ||
-            SELF.numExterior || SELF.sep ||
-            SELF.numInterior || SELF.sep ||
-            SELF.colonia || SELF.sep ||
-            SELF.localidad || SELF.sep ||
-            SELF.referencia || SELF.sep ||
-            SELF.municipio || SELF.sep ||
-            SELF.estado || SELF.sep ||
-            SELF.domFiscal || SELF.sep ||
-            SELF.resFiscal || SELF.sep ||
-            SELF.numRegIdTrib || SELF.sep ||
-            SELF.usoCFDI || SELF.sep ||
-            SELF.regimenFiscal || SELF.sep ||
-            SELF.nombreParticipante || SELF.sep ||
-            SELF.idParticipante || SELF.sep ||
-            SELF.programa
+            SELF.sanitizar(SELF.identificador) || SELF.sep ||
+            SELF.sanitizar(SELF.rfc) || SELF.sep ||
+            SELF.sanitizar(SELF.nombre) || SELF.sep ||
+            SELF.sanitizar(SELF.pais) || SELF.sep ||
+            SELF.sanitizar(SELF.calle) || SELF.sep ||
+            SELF.sanitizar(SELF.numExterior) || SELF.sep ||
+            SELF.sanitizar(SELF.numInterior) || SELF.sep ||
+            SELF.sanitizar(SELF.colonia) || SELF.sep ||
+            SELF.sanitizar(SELF.localidad) || SELF.sep ||
+            SELF.sanitizar(SELF.referencia) || SELF.sep ||
+            SELF.sanitizar(SELF.municipio) || SELF.sep ||
+            SELF.sanitizar(SELF.estado) || SELF.sep ||
+            SELF.sanitizar(SELF.domFiscal) || SELF.sep ||
+            SELF.sanitizar(SELF.resFiscal) || SELF.sep ||
+            SELF.sanitizar(SELF.numRegIdTrib) || SELF.sep ||
+            SELF.sanitizar(SELF.usoCFDI) || SELF.sep ||
+            SELF.sanitizar(SELF.regimenFiscal) || SELF.sep ||
+            SELF.sanitizar(SELF.nombreParticipante) || SELF.sep ||
+            SELF.sanitizar(SELF.idParticipante) || SELF.sep ||
+            SELF.sanitizar(SELF.programa)
         ;
     END imprimir_linea;
 
@@ -962,17 +965,17 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep ||
-            SELF.clave_servicio || SELF.sep ||
-            SELF.noIdentificacion || SELF.sep ||
+            SELF.sanitizar(SELF.clave_servicio) || SELF.sep ||
+            SELF.sanitizar(SELF.noIdentificacion) || SELF.sep ||
             TO_CHAR(NVL(SELF.cantidad, 1)) || SELF.sep ||
-            SELF.descripcion || SELF.sep ||
+            SELF.sanitizar(SELF.descripcion) || SELF.sep ||
             SELF.format_moneda(SELF.valorUnitario) || SELF.sep ||
             SELF.format_moneda(SELF.importe) || SELF.sep ||
-            SELF.unidadMedida || SELF.sep ||
-            SELF.claveUnidad || SELF.sep ||
+            SELF.sanitizar(SELF.unidadMedida) || SELF.sep ||
+            SELF.sanitizar(SELF.claveUnidad) || SELF.sep ||
             SELF.format_moneda(SELF.descuento) || SELF.sep ||
-            SELF.idConcepto || SELF.sep ||
-            SELF.objetoImp
+            SELF.sanitizar(SELF.idConcepto) || SELF.sep ||
+            SELF.sanitizar(SELF.objetoImp)
         ;
     END imprimir_linea;
 
@@ -1114,10 +1117,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05C AS
         respuesta VARCHAR2(500 CHAR);
     BEGIN
         respuesta := '\n' || SELF.tipo_registro || SELF.sep || 
-            SELF.idConcepto || SELF.sep ||
+            SELF.sanitizar(SELF.idConcepto) || SELF.sep ||
             SELF.format_moneda(SELF.baseDec) || SELF.sep ||
-            SELF.impuesto || SELF.sep ||
-            SELF.tipoFactor || SELF.sep
+            SELF.sanitizar(SELF.impuesto) || SELF.sep ||
+            SELF.sanitizar(SELF.tipoFactor) || SELF.sep
         ;
         
         IF (SELF.tipoFactor != 'Exento') THEN
@@ -1213,10 +1216,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_06 AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_registro || SELF.sep || 
-            SELF.clave_impuesto || SELF.sep ||
+            SELF.sanitizar(SELF.clave_impuesto) || SELF.sep ||
             TRIM(TO_CHAR(SELF.tasaCuota, '0.009999')) || SELF.sep ||
             SELF.format_moneda(SELF.importe) || SELF.sep ||
-            SELF.tipoFactor || SELF.sep ||
+            SELF.sanitizar(SELF.tipoFactor) || SELF.sep ||
             SELF.format_moneda(SELF.baseDec)
         ;
     END imprimir_linea;
@@ -1405,11 +1408,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_09 AS
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2 IS
     BEGIN
         RETURN '\n' || SELF.tipo_Registro || SELF.sep || 
-            SELF.idIntReceptor || SELF.sep ||
-            SELF.eMail || SELF.sep ||
-            SELF.asunto || SELF.sep ||
-            SELF.mensaje || SELF.sep ||
-            SELF.adjunto
+            SELF.sanitizar(SELF.idIntReceptor) || SELF.sep ||
+            SELF.sanitizar(SELF.eMail) || SELF.sep ||
+            SELF.sanitizar(SELF.asunto) || SELF.sep ||
+            SELF.sanitizar(SELF.mensaje) || SELF.sep ||
+            SELF.sanitizar(SELF.adjunto)
         ;
     END imprimir_linea;
 END;
@@ -1489,7 +1492,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
     MEMBER PROCEDURE ajustar_pubgral,
     MEMBER PROCEDURE validar,
     MEMBER PROCEDURE impuestos_default(pidm NUMBER, tranNumber NUMBER,
-        procesoFactura IN VARCHAR2,
+        procesoFactura VARCHAR2, tranImpuestos NUMBER,
         totalCargos OUT NUMBER, impTrasladados OUT NUMBER),
     MEMBER PROCEDURE impuestos_anticipada(pidm NUMBER, tranNumber NUMBER,
         tranImpuestos NUMBER,
@@ -1544,19 +1547,17 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, numEntidad, 
             difEmpresa, metodoPago, formaPago, procesoFactura);
-        -- IF (SELF.info_gral_comprobante.descuento = 0) THEN
-        -- END IF; 
         numLineas := numLineas + 1;
+        
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
-
-        -- IF (SELF.receptor.esPubGral = 'TRUE') THEN
-        --     SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;
-        -- END IF;
-
-        SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
         numLineas := numLineas + 1;
-
-        SELF.estatus_debug := 'A';
+        
+        SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;
+        IF (NVL(SELF.envio_automatico.eMail, '*') != '*') THEN
+            numLineas := numLineas + 1;
+        END IF;
+        
+        SELF.estatus_debug := 'I';
         SELF.REGISTRAR_DEBUG('linea_factura', 'procesoFactura:'||procesoFactura);
         IF (procesoFactura IN ('NDC', 'FST')) THEN
             relacionDoctos := 'Nota de Crédito para '||matricula||' en transacción '||TO_CHAR(tranOriginalAntic);
@@ -1594,7 +1595,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             ajusta_conceptos(vln_pidm, tranOriginalAntic, adicional);
         ELSE 
             impuestos_default(vln_pidm, tranNumber, procesoFactura, 
-                totalCargos, impTrasladados);
+                tranFantImpuestos, totalCargos, impTrasladados);
         END IF;
         
         numLineas := numLineas + SELF.conceptos.COUNT
@@ -1608,6 +1609,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.info_gral_comprobante.set_cargos(totalCargos, impTrasladados);
         
         numLineas := numLineas + SELF.impuestosRets.COUNT;
+        
         numLineas := numLineas + 1;
         SELF.finCfdi := ty_tralix_linea_99(numLineas);
 
@@ -1772,7 +1774,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
     END validar;
 
     MEMBER PROCEDURE impuestos_default(pidm NUMBER, tranNumber NUMBER,
-        procesoFactura IN VARCHAR2,
+        procesoFactura VARCHAR2, tranImpuestos NUMBER,
         totalCargos OUT NUMBER, impTrasladados OUT NUMBER) IS
         impuestoTras TY_TRALIX_LINEA_06;
         concImpTrasRow TY_TRALIX_LINEA_05C;
@@ -1782,9 +1784,11 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         concepto TY_TRALIX_LINEA_05;
         vln_subTotal TBRACCD.TBRACCD_AMOUNT%TYPE;
     BEGIN
-        dbms_output.put_line('procesoFactura:'||procesoFactura);
         totalCargos := 0;
         impTrasladados := 0;
+        SELF.estatus_debug := 'A';
+        SELF.REGISTRAR_DEBUG('linea_factura', 'impuestos_default');
+        SELF.REGISTRAR_DEBUG('linea_factura', 'procesoFactura:'||procesoFactura);
         FOR j IN (
             SELECT tbraccd_amount, tbraccd_receipt_number,
                 tbraccd_detail_code
@@ -1793,22 +1797,34 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 AND tbraccd_tran_number = tranNumber
         ) LOOP
             /* Buscar impuestos */
-            SELECT NVL(SUM(tbraccd_amount), 0),
-                MAX(tbraccd_detail_code)
-            INTO vln_sumaImpuestos,
-                vlc_detalleImp
-            FROM tbraccd
-            WHERE tbraccd_pidm = pidm
-                AND tbraccd_tran_number != tranNumber
-                AND tbraccd_receipt_number = j.tbraccd_receipt_number
-                AND tbraccd_srce_code = 'Z';
-
             IF (procesoFactura = 'NDC') THEN
+                SELF.REGISTRAR_DEBUG('linea_factura', 'Z3');
                 vln_sumaImpuestos := 0;
+            ELSIF (tranImpuestos > 0) THEN
+                SELF.REGISTRAR_DEBUG('linea_factura', 'Z4');
+                FOR k IN ( 
+                    SELECT tbraccd_amount
+                    FROM tbraccd
+                    WHERE tbraccd_pidm = pidm
+                        AND tbraccd_tran_number = tranImpuestos
+                ) LOOP
+                    vln_sumaImpuestos := NVL(k.tbraccd_amount, 0);
+                END LOOP;
+            ELSE
+                SELF.REGISTRAR_DEBUG('linea_factura', 'Z5');
+                SELECT NVL(SUM(tbraccd_amount), 0),
+                    MAX(tbraccd_detail_code)
+                INTO vln_sumaImpuestos,
+                    vlc_detalleImp
+                FROM tbraccd
+                WHERE tbraccd_pidm = pidm
+                    AND tbraccd_tran_number != tranNumber
+                    AND tbraccd_receipt_number = j.tbraccd_receipt_number
+                    AND tbraccd_srce_code = 'Z';
             END IF;
 
             /* si hay impuestos */
-            dbms_output.put_line('Impuestos:'||vln_sumaImpuestos);
+            SELF.REGISTRAR_DEBUG('linea_factura', 'Impuestos:'||vln_sumaImpuestos);
             IF (vln_sumaImpuestos <= 0) THEN
                 vlb_exento := TRUE;
                 concepto := TY_TRALIX_LINEA_05(pidm, tranNumber, procesoFactura);
@@ -1845,11 +1861,16 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 -- vlc_detalleImp := j.tbraccd_detail_code;
                 vlc_detalleImp := 'IVA';    /* TEMPORAL */
 
+                SELF.REGISTRAR_DEBUG('linea_factura', 'Z2 vln_sumaImpuestos:'||vln_sumaImpuestos||' Monto:'||j.tbraccd_amount);
+
                 impuestoTras := TY_TRALIX_LINEA_06(
                     vlc_detalleImp, 
                     vln_sumaImpuestos / (j.tbraccd_amount - vln_sumaImpuestos),
+                    -- vln_sumaImpuestos / j.tbraccd_amount,
                     vln_sumaImpuestos,
                     j.tbraccd_amount - vln_sumaImpuestos);
+
+                SELF.REGISTRAR_DEBUG('linea_factura', impuestoTras.imprimir_linea);
 
                 impTrasladados := impTrasladados + vln_sumaImpuestos;
 
@@ -1875,6 +1896,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             SELF.concImpTras.EXTEND;
             SELF.concImpTras(SELF.concImpTras.COUNT) := concImpTrasRow;
         END LOOP;
+        SELF.estatus_debug := 'I';
     END impuestos_default;
 
     MEMBER PROCEDURE impuestos_anticipada(pidm NUMBER, tranNumber NUMBER,
@@ -1892,6 +1914,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         totalCargos := 0;
         impTrasladados := 0;
 
+        SELF.estatus_debug := 'A';
         programa := SELF.receptor.programa;
         IF (NVL(SELF.receptor.programa, '|') = '|') THEN
             FOR j IN (
@@ -1915,6 +1938,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         END LOOP;
 
         IF (tranImpuestos > 0) THEN
+            SELF.REGISTRAR_DEBUG('linea_factura', 'Z7');
             FOR k IN (
                 SELECT tbraccd_amount
                 FROM tbraccd
@@ -1933,6 +1957,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
 
             totalCargos := totalCargos + vln_subTotal;
 
+            SELF.REGISTRAR_DEBUG('linea_factura', 'Z1 vln_sumaImpuestos:'||vln_sumaImpuestos||' vln_subTotal:'||vln_subTotal);            
+
             impuestoTras := TY_TRALIX_LINEA_06(
                 vlc_detalleImp, 
                 vln_sumaImpuestos / vln_subTotal,
@@ -1950,6 +1976,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 vln_sumaImpuestos,
                 'Tasa');
         ELSE
+            SELF.REGISTRAR_DEBUG('linea_factura', 'Z8');
             vlb_exento := TRUE;
             concepto := TY_TRALIX_LINEA_05(pidm, tranNumber, 'XXX');
 
@@ -1972,6 +1999,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 0,
                 'Exento');
         END IF;
+
+        SELF.estatus_debug := 'I';
 
         SELF.impuestosTras.EXTEND;
         SELF.impuestosTras(SELF.impuestosTras.COUNT) := impuestoTras;    
