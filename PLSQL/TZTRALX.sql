@@ -901,9 +901,9 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         pr_registrar_debug('fn_factura_base_tralix', 'payload:' || vlc_objeto_principal);
         
-        -- IF (vlt_respuesta.estatus = 'ERROR') THEN
-        --     RETURN vlt_respuesta;
-        -- END IF;
+        -- vlt_respuesta.estatus := 'ERROR';
+        -- vlt_respuesta.agregar_error('No se envía, probando.');
+        -- RETURN vlt_respuesta;
         
         vlc_envioTralix := envio_factura_tralix(vlc_objeto_principal, vlb_estatusEnvio);
         vln_monto := 0;
@@ -1005,14 +1005,14 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     TZRPOFI_PIDM, TZRPOFI_SDOC_CODE, TZRPOFI_DOC_NUMBER, TZRPOFI_DOC_STATUS, TZRPOFI_TERM_CODE, 
                     TZRPOFI_DCAT_CODE, TZRPOFI_IAC_CDE, TZRPOFI_INCL_BARCODE_IND, TZRPOFI_INCL_PI_IND, 
                     TZRPOFI_PI_IND, TZRPOFI_INCL_DOCNUM_IND, TZRPOFI_DOCNUM_POS, TZRPOFI_EXP_PDF_LBL_1,
-                    TZRPOFI_INCL_SCHG_LABEL, TZRPOFI_DATE_CHG_1, TZRPOFI_DETC_CODE_CHG_1, 
+                    TZRPOFI_INCL_SCHG_LABEL, TZRPOFI_DATE_CHG_1, TZRPOFI_DETC_CODE_CHG_1, TZRPOFI_DATE_CHG_2,
                     TZRPOFI_OVRD_FEE_1, TZRPOFI_PO_AMT_1, TZRPOFI_PO_OVRD_AMT_1,
                     TZRPOFI_DATA_ORIGIN, TZRPOFI_CREATE_USER_ID, TZRPOFI_CREATE_DATE, 
                     TZRPOFI_USER_ID, TZRPOFI_ACTIVITY_DATE
                 ) VALUES (
                     vln_pidm, vlc_prefijo, TO_CHAR(vln_numFactura), 'A', tipo_pago_banner, 
                     'CSH', uuidTralix, 'N', 'N', 
-                    'N', 'N', tran_number, fn_obtener_idEmpresa(vlc_num_entidad),
+                    'N', 'N', tran_number, fn_obtener_idEmpresa(vlc_num_entidad), datosFactura.info_gral_comprobante.fecha,
                     'N', SYSDATE, 'X', 
                     tran_number_orig_ant, tran_number_imp, datosFactura.info_gral_comprobante.tipoCambio,
                     'Tralix', USER, SYSDATE, 
@@ -1495,7 +1495,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
             NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'ANT', tran_number_original, 
-            tran_number_imp, desc_adicional, '', data_origin);
+            tran_number_imp, translate(desc_adicional, chr(10) || chr(13) || chr(09), ' '), 
+            '', data_origin);
     END fn_factura_ant_tralix;
 
     FUNCTION fn_factura_cp_tralix(
@@ -1862,6 +1863,11 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             WHEN OTHERS THEN
                 vlc_respuesta := sqlerrm;
         END;
+        IF (vlc_respuesta != 'OP_EXITOSA') THEN
+            ROLLBACK;
+        ELSE
+            COMMIT;
+        END IF;
         pr_registrar_debug('fn_verifica_cancelacion','Respuesta:'||vlc_respuesta);
         RETURN vlc_respuesta;
     END fn_verifica_cancelacion;
