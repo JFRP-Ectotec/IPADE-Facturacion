@@ -454,6 +454,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
         secuencial NUMBER;
 
         vln_tipo_factura VARCHAR2(10 CHAR);
+        vld_fecha_vencimiento TBRACCD.TBRACCD_EFFECTIVE_DATE%TYPE;
     BEGIN
         registros := TY_TRALIX_TSTA_ARR();
 
@@ -504,11 +505,27 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
         vlc_seqCodigo := SUBSTR(vlc_seqCodigo, 2, 1);
         vlc_codigo := 'FV'||vlc_seqCodigo;        
-        IF (tipo_factura != 'FP') THEN
-            vlc_valor := TO_CHAR(datos_factura.info_gral_comprobante.fecha, 'DD-MON-YYYY');
-        ELSE
-            vlc_valor := TO_CHAR(datos_compPago.info_gral_comprobante.fecha, 'DD-MON-YYYY');
+        
+        FOR z IN (
+            SELECT tbraccd_effective_date
+            FROM tbraccd
+            WHERE tbraccd_pidm = pidm
+                AND tbraccd_tran_number = tran_number
+        ) LOOP
+            vld_fecha_vencimiento := z.tbraccd_effective_date;
+        END LOOP;
+
+        IF (vld_fecha_vencimiento IS NULL) THEN
+            IF (tipo_factura != 'FP') THEN
+                -- vlc_valor := TO_CHAR(datos_factura.info_gral_comprobante.fecha, 'DD-MON-YYYY');
+                vld_fecha_vencimiento := datos_factura.info_gral_comprobante.fecha;
+            ELSE
+                -- vlc_valor := TO_CHAR(datos_compPago.info_gral_comprobante.fecha, 'DD-MON-YYYY');
+                vld_fecha_vencimiento := datos_compPago.info_gral_comprobante.fecha;
+            END IF;
         END IF;
+        vlc_valor := TO_CHAR(vld_fecha_vencimiento, 'DD-MON-YYYY');
+
         pr_registrar_tvsta(vlc_codigo, '', vlc_valor, registros);
         pr_registrar_debug('fn_registrar',vlc_codigo||' - '||vlc_valor);
 

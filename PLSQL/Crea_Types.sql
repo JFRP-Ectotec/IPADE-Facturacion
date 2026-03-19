@@ -102,7 +102,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA AS
 
     MEMBER FUNCTION SANITIZAR(pic_palabra VARCHAR2) RETURN VARCHAR2 IS
     BEGIN
-        RETURN translate(pic_palabra, chr(10) || chr(13) || chr(09) || '|', '');
+        -- RETURN translate(pic_palabra, chr(10) || chr(13) || chr(09) || '|', '');
+        RETURN REPLACE(pic_palabra, '|', '');
     END SANITIZAR;
 END;
 
@@ -199,6 +200,7 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_01 UNDER TY_TRALIX_LINEA
         difEmpresa VARCHAR2,
         metodoPago VARCHAR2,
         formaPago VARCHAR2,
+        fechaEmision DATE,
         procesoFactura VARCHAR2
     ) RETURN SELF AS RESULT,
     MEMBER PROCEDURE set_cargos(cargos NUMBER, imp_ret NUMBER),
@@ -217,6 +219,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
         difEmpresa VARCHAR2,
         metodoPago VARCHAR2,
         formaPago VARCHAR2,
+        fechaEmision DATE,
         procesoFactura VARCHAR2
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
@@ -249,6 +252,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
             SELF.lugarExpedicion := q.spraddr_zip;
         END LOOP;
 
+        SELF.fecha := fechaEmision;
         FOR i IN (
             SELECT t.tbraccd_amount, t.tbraccd_effective_date
             FROM tbraccd t
@@ -263,9 +267,11 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
             IF (procesoFactura = 'CP') THEN
                 SELF.totalLetra := '';
             END IF;
-            SELF.fecha := i.tbraccd_effective_date;
+            
+            IF (SELF.fecha IS NULL) THEN
+                SELF.fecha := i.tbraccd_effective_date;
+            END IF;
             -- SELF.fecha := i.tbraccd_effective_date - 6/24;
-            -- SELF.fecha := SYSDATE - 1;   -- TEMPORAL: Tomar TBRACCD_EFFECTIVE_DATE de la transacción.
         END LOOP;
 
         -- FOR j IN (
@@ -940,12 +946,15 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
                 WHERE tbraccd_pidm = pidm
                     AND tbraccd_tran_number != tranNumber
                     AND tbraccd_receipt_number = i.tbraccd_receipt_number
-                    AND tbraccd_srce_code = 'Z'
+                    AND tbraccd_detail_code LIKE '%IVA%'  /* TODO: Ajustar a query dentro de SORXREF */
+                    -- AND tbraccd_srce_code = 'Z'
                 ;
 
+                dbms_output.put_line('VU2');
                 SELF.valorUnitario := i.tbraccd_amount - totImpuestos;
                 SELF.importe := SELF.valorUnitario;
             ELSE
+                dbms_output.put_line('VU3');
                 SELF.valorUnitario := ABS(i.tbraccd_amount);
                 SELF.importe := ABS(SELF.valorUnitario);
             END IF;
@@ -1486,7 +1495,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_FACTURA AS OBJECT
         tranOriginalAntic NUMBER,
         tranFantImpuestos NUMBER,
         adicional VARCHAR2,
-        matriculaOriginal VARCHAR2
+        matriculaOriginal VARCHAR2,
+        fechaEmision DATE
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
     MEMBER PROCEDURE ajustar_pubgral,
@@ -1514,7 +1524,8 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         tranOriginalAntic NUMBER,
         tranFantImpuestos NUMBER,
         adicional VARCHAR2,
-        matriculaOriginal VARCHAR2
+        matriculaOriginal VARCHAR2,
+        fechaEmision DATE
     ) RETURN SELF AS RESULT IS
         concepto TY_TRALIX_LINEA_05;
         -- impuestoTras TY_TRALIX_LINEA_06;
@@ -1546,7 +1557,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.envio_automatico := ty_tralix_linea_09(matricula);
 
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, numEntidad, 
-            difEmpresa, metodoPago, formaPago, procesoFactura);
+            difEmpresa, metodoPago, formaPago, fechaEmision, procesoFactura);
         numLineas := numLineas + 1;
         
         SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
@@ -1820,7 +1831,9 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 WHERE tbraccd_pidm = pidm
                     AND tbraccd_tran_number != tranNumber
                     AND tbraccd_receipt_number = j.tbraccd_receipt_number
-                    AND tbraccd_srce_code = 'Z';
+                    AND tbraccd_detail_code LIKE '%IVA%'  /* TODO: Ajustar a query dentro de SORXREF */
+                --    AND tbraccd_srce_code = 'Z'
+                ;
             END IF;
 
             /* si hay impuestos */
@@ -1949,6 +1962,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             END LOOP;
 
             concepto := TY_TRALIX_LINEA_05(pidm, tranNumber, 'XXX');
+            dbms_output.put_line('VU1');
             concepto.valorUnitario := vln_subTotal + vln_sumaImpuestos;
             concepto.importe := vln_subTotal;
 

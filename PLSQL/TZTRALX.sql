@@ -66,6 +66,7 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         tran_number_original IN NUMBER DEFAULT 0,
         tran_number_imp IN NUMBER DEFAULT 0,
         desc_adicional IN VARCHAR2 DEFAULT '',
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
@@ -74,6 +75,7 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         tran_number IN NUMBER,
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
@@ -84,6 +86,7 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE',  /* Valores válidos 'PUE', 'PPD' */
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
         tran_number_original IN NUMBER,
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
@@ -96,6 +99,7 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         matricula_original IN VARCHAR2,
         tran_number_original IN NUMBER,
         tran_impuestos_orig IN NUMBER,
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
@@ -619,6 +623,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tran_number_imp IN NUMBER DEFAULT 0,
         desc_adicional IN VARCHAR2 DEFAULT '',
         matricula_orig_ant IN VARCHAR2 DEFAULT '',
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')   -- DEF = Default, ANT = Anticipada, CP = Complemento de Pago
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlc_respuesta CLOB;
@@ -664,7 +669,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pr_registrar_debug('fn_factura_base', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number||' tipo_pago_banner:'||
             tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar||' proceso_factura:'||proceso_factura||' mat_orig_ant:'||matricula_orig_ant
             ||' tran_number_orig_ant:'||tran_number_orig_ant||' tran_number_imp:'||tran_number_imp
-            ||' desc_adicional:'||desc_adicional);
+            ||' desc_adicional:'||desc_adicional||' fecha_emision:'||TO_CHAR(fecha_emision, 'DD-MON-YYYY'));
 
         vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
 
@@ -796,7 +801,8 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
             datosFactura := ty_tralix_factura(matricula, tran_number, vlc_num_entidad, 
                 1, vlc_tipo_pago_banner, tipo_pago_facturar, proceso_factura,
-                tran_number_orig_ant, tran_number_imp, desc_adicional, matricula_orig_ant);       
+                tran_number_orig_ant, tran_number_imp, desc_adicional, 
+                matricula_orig_ant, fecha_emision);       
 
             datosFactura.validar;
             IF (datosFactura.errores.COUNT > 0) THEN
@@ -1005,15 +1011,15 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     TZRPOFI_PIDM, TZRPOFI_SDOC_CODE, TZRPOFI_DOC_NUMBER, TZRPOFI_DOC_STATUS, TZRPOFI_TERM_CODE, 
                     TZRPOFI_DCAT_CODE, TZRPOFI_IAC_CDE, TZRPOFI_INCL_BARCODE_IND, TZRPOFI_INCL_PI_IND, 
                     TZRPOFI_PI_IND, TZRPOFI_INCL_DOCNUM_IND, TZRPOFI_DOCNUM_POS, TZRPOFI_EXP_PDF_LBL_1,
-                    TZRPOFI_INCL_SCHG_LABEL, TZRPOFI_DATE_CHG_1, TZRPOFI_DETC_CODE_CHG_1, TZRPOFI_DATE_CHG_2,
+                    TZRPOFI_INCL_SCHG_LABEL, TZRPOFI_DATE_CHG_1, TZRPOFI_DETC_CODE_CHG_1, TZRPOFI_PDF_DATE,
                     TZRPOFI_OVRD_FEE_1, TZRPOFI_PO_AMT_1, TZRPOFI_PO_OVRD_AMT_1,
                     TZRPOFI_DATA_ORIGIN, TZRPOFI_CREATE_USER_ID, TZRPOFI_CREATE_DATE, 
                     TZRPOFI_USER_ID, TZRPOFI_ACTIVITY_DATE
                 ) VALUES (
                     vln_pidm, vlc_prefijo, TO_CHAR(vln_numFactura), 'A', tipo_pago_banner, 
                     'CSH', uuidTralix, 'N', 'N', 
-                    'N', 'N', tran_number, fn_obtener_idEmpresa(vlc_num_entidad), datosFactura.info_gral_comprobante.fecha,
-                    'N', SYSDATE, 'X', 
+                    'N', 'N', tran_number, fn_obtener_idEmpresa(vlc_num_entidad),
+                    'N', SYSDATE, 'X', fecha_emision,
                     tran_number_orig_ant, tran_number_imp, datosFactura.info_gral_comprobante.tipoCambio,
                     'Tralix', USER, SYSDATE, 
                     USER, SYSDATE
@@ -1058,7 +1064,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 WHEN OTHERS THEN
                     rollback;
                     vlt_respuesta.estatus := 'ERROR';
-                    vlt_respuesta.agregar_error(sqlerrm);
+                    vlt_respuesta.agregar_error('TZRPOFI: '||sqlerrm);
                     RETURN vlt_respuesta;
             END;
 
@@ -1076,13 +1082,22 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
+        vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
     BEGIN
         pr_registrar_debug('fn_factura_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar);
 
+        IF (NVL(matricula, '|') = '|' OR LENGTH(matricula) < 2
+            OR NVL(tran_number, 0) = 0) THEN
+            vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error('Matrícula y Número de transacción Banner son necesarios.');
+            RETURN vlt_respuesta;
+        END IF;
+
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
             NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'DEF', 0, 0,
-            '', '', data_origin);
+            '', '', NULL, data_origin);
     END fn_factura_tralix;
 
     FUNCTION fn_factura_tralix_json(
@@ -1477,6 +1492,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tran_number_original IN NUMBER DEFAULT 0,
         tran_number_imp IN NUMBER DEFAULT 0,
         desc_adicional IN VARCHAR2 DEFAULT '',
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
@@ -1484,19 +1500,20 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pr_registrar_debug('fn_factura_ant_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar
             ||' tran_number_original:'||tran_number_original||' tran_number_imp:'||tran_number_imp
-            ||' desc_adicional:'||desc_adicional);
+            ||' desc_adicional:'||desc_adicional||' fecha_emision:'||TO_CHAR(fecha_emision, 'DD-MON-YYYY'));
 
-        -- IF (tipo_pago_facturar != 'PPD') THEN
-        --     vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
-        --     vlt_respuesta.estatus := 'ERROR';
-        --     vlt_respuesta.agregar_error('Una factura anticipada solo puede ser de pago PPD.');
-        --     RETURN vlt_respuesta;
-        -- END IF;
+        IF (NVL(matricula, '|') = '|' OR LENGTH(matricula) < 2
+            OR NVL(tran_number, 0) = 0) THEN
+            vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error('Matrícula y Número de transacción Banner son necesarios.');
+            RETURN vlt_respuesta;
+        END IF;
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
             NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'ANT', tran_number_original, 
             tran_number_imp, translate(desc_adicional, chr(10) || chr(13) || chr(09), ' '), 
-            '', data_origin);
+            '', fecha_emision, data_origin);
     END fn_factura_ant_tralix;
 
     FUNCTION fn_factura_cp_tralix(
@@ -1504,15 +1521,25 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tran_number IN NUMBER,
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
     BEGIN
         pr_registrar_debug('fn_factura_cp_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
-            ||' tipo_pago_banner:'||tipo_pago_banner||' etiqueta:'||etiqueta);
+            ||' tipo_pago_banner:'||tipo_pago_banner||' etiqueta:'||etiqueta
+            ||' fecha_emision:'||TO_CHAR(fecha_emision, 'DD-MON-YYYY'));
+
+        IF (NVL(matricula, '|') = '|' OR LENGTH(matricula) < 2
+            OR NVL(tran_number, 0) = 0) THEN
+            vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error('Matrícula y Número de transacción Banner son necesarios.');
+            RETURN vlt_respuesta;
+        END IF;
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
-            'PPD', NVL(etiqueta, 'FAC'), 'CP', 0, 0, '', '', data_origin);
+            'PPD', NVL(etiqueta, 'FAC'), 'CP', 0, 0, '', '', fecha_emision, data_origin);
     END fn_factura_cp_tralix;
 
     FUNCTION fn_notacred_tralix(
@@ -1522,17 +1549,26 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE',  /* Valores válidos 'PUE', 'PPD' */
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
         tran_number_original IN NUMBER,
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
     BEGIN
         pr_registrar_debug('fn_notacred_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar
-            ||' tran_number_original:'||tran_number_original);
+            ||' tran_number_original:'||tran_number_original||' fecha_emision:'||TO_CHAR(fecha_emision, 'DD-MON-YYYY'));
+
+        IF (NVL(matricula, '|') = '|' OR LENGTH(matricula) < 2
+            OR NVL(tran_number, 0) = 0) THEN
+            vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error('Matrícula y Número de transacción Banner son necesarios.');
+            RETURN vlt_respuesta;
+        END IF;
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
             NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'NDC', tran_number_original, 
-            0, '', '', data_origin);
+            0, '', '', fecha_emision, data_origin);
     END fn_notacred_tralix;
 
     FUNCTION fn_factsust_tralix(
@@ -1544,6 +1580,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         matricula_original IN VARCHAR2,
         tran_number_original IN NUMBER,
         tran_impuestos_orig IN NUMBER,
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
@@ -1551,11 +1588,19 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pr_registrar_debug('fn_factsust_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar
             ||' matricula_original:'||matricula_original||' tran_number_original:'||tran_number_original
-            ||' tran_impuestos_orig:'||tran_impuestos_orig);
+            ||' tran_impuestos_orig:'||tran_impuestos_orig||' fecha_emision:'||TO_CHAR(fecha_emision, 'DD-MON-YYYY'));
+
+        IF (NVL(matricula, '|') = '|' OR LENGTH(matricula) < 2
+            OR NVL(tran_number, 0) = 0) THEN
+            vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error('Matrícula y Número de transacción Banner son necesarios.');
+            RETURN vlt_respuesta;
+        END IF;
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
             NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'FST', tran_number_original, 
-            tran_impuestos_orig, '', matricula_original, data_origin);
+            tran_impuestos_orig, '', matricula_original, fecha_emision, data_origin);
     END fn_factsust_tralix;
 
     FUNCTION existe_factura(
@@ -1873,6 +1918,5 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
     END fn_verifica_cancelacion;
 END TZTRALX;
 /
-
 
 show errors;

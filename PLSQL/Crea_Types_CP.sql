@@ -602,7 +602,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         END IF;
         
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, 
-            numEntidad, difEmpresa, metodoPago, formaPago, 'XXX');
+            numEntidad, difEmpresa, metodoPago, formaPago, NULL, 'XXX');
         SELF.info_gral_comprobante.metodoPago := '';
         SELF.info_gral_comprobante.formaPago := '';
         SELF.info_gral_comprobante.tipoComprobante := 'P';

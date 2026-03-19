@@ -1,0 +1,22 @@
+-- Correctos impuestos envío normal, Z5 y luego Z2
+-- linea_factura -> Z2 vln_sumaImpuestos:1.38 Monto:10
+00|A00085183_9.txt|FAC|4.0|
+\\n01|ZPB11507|ZPB|11507|2026-03-11T16:10:38|8.62|10.00|1.38||||DIEZ PESOS CON 00/100|MXN|1|||||I|PUE|02080||03||01||
+\\n03|XAXX010101000|XAXX010101000|IPADE2 PARTICIPANTE 6|México|AV AZCAPOTZALCO|145|0|CLAVERIA|Ciudad De Mexico||Azcapotzalco|Distrito Federal|02080|||S01|616|IPADE2 PARTICIPANTE 6|A00085183|DSV|
+\\n05|86132000||1|Capacitación Programa de DireccioÌ�n por Servicios (Con Viaje)|8.62|8.62||E48||Linea_1|02|
+\\n05C|Linea_1|8.62|002|Tasa|0.160000|1.38|
+\\n06|002|0.160000|1.38|Tasa|8.62|
+\\n99|7
+
+-- Correctos impuestos envío normal, Z4 y luego Z2
+-- linea_factura -> Z2 vln_sumaImpuestos:160 Monto:1000
+00|A00085020_366.txt|FAC|4.0|
+\\n01|ZPB11511|ZPB|11511|2026-03-10T15:22:21|840.00|1000.00|160.00||||UN MIL PESOS CON 00/100|MXN|1|||||I|PUE|02080||01||01||
+\\n02|Factura que sustituirá|04|
+\\n02A|Factura que sustituirá|45DAA256-8A20-480D-B014-751C8D577E7D|
+\\n03|XAXX010101000|XAXX010101000|SOCIEDAD PANAMERICANA DE ESTUDIOS EMPRESARIALES|México|AV AZCAPOTZALCO,|145|12|CLAVERIA|Azcapotzalco||Azcapotzalco|Ciudad de México|02080|||S01|610|Pago x2 Complemento|A00085020|AD|
+\\n05|86132000||1|Capacitación Programa de Alta Dirección AD|1000.00|840.00||E48||Linea_1|02|
+\\n05C|Linea_1|840.00|002|Tasa|0.190000|160.00|
+\\n06|002|0.190000|160.00|Tasa|840.00|
+\\n09|XAXX010101000|correoenviofac@gmail.com|CFDI IPADE de A00085020|||
+\\n99|10
