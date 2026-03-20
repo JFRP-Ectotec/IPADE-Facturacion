@@ -75,6 +75,7 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         tran_number IN NUMBER,
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
+        tran_a_pagar IN NUMBER,
         fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
@@ -831,31 +832,35 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             END IF;
             -- datosFactura.ajustar_pubgral;
         ELSE   -- Complemento de Pago
-            FOR z IN (
-                SELECT tbrappl_chg_tran_number
-                FROM tbrappl
-                WHERE tbrappl_pidm = vln_pidm
-                    AND tbrappl_pay_tran_number = tran_number
-                    AND tbrappl_reappl_ind IS NULL
-            ) LOOP
-                vln_tran_number_orig := z.tbrappl_chg_tran_number;
-            END LOOP;
+            vln_tran_number_orig := tran_number_orig_ant;
 
             IF (NVL(vln_tran_number_orig, 0) = 0) THEN
-                FOR w IN (
-                SELECT tbraccd_tran_number_paid
-                FROM tbraccd
-                WHERE tbraccd_pidm = vln_pidm
-                    AND tbraccd_tran_number = tran_number
+                FOR z IN (
+                    SELECT tbrappl_chg_tran_number
+                    FROM tbrappl
+                    WHERE tbrappl_pidm = vln_pidm
+                        AND tbrappl_pay_tran_number = tran_number
+                        AND tbrappl_reappl_ind IS NULL
                 ) LOOP
-                    vln_tran_number_orig := w.tbraccd_tran_number_paid;
+                    vln_tran_number_orig := z.tbrappl_chg_tran_number;
                 END LOOP;
+
+                IF (NVL(vln_tran_number_orig, 0) = 0) THEN
+                    FOR w IN (
+                    SELECT tbraccd_tran_number_paid
+                    FROM tbraccd
+                    WHERE tbraccd_pidm = vln_pidm
+                        AND tbraccd_tran_number = tran_number
+                    ) LOOP
+                        vln_tran_number_orig := w.tbraccd_tran_number_paid;
+                    END LOOP;
+                END IF;
             END IF;
 
             IF (NVL(vln_tran_number_orig, 0) = 0) THEN
                 vlt_respuesta.estatus := 'ERROR';
                 vlt_respuesta.agregar_error('El complemento no tiene una transacción válida para pagar.');
-                -- RETURN vlt_respuesta;   
+                RETURN vlt_respuesta;   
             END IF;
 
             FOR x IN (
@@ -1521,6 +1526,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tran_number IN NUMBER,
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
+        tran_a_pagar IN NUMBER,
         fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
@@ -1539,7 +1545,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         END IF;
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
-            'PPD', NVL(etiqueta, 'FAC'), 'CP', 0, 0, '', '', fecha_emision, data_origin);
+            'PPD', NVL(etiqueta, 'FAC'), 'CP', tran_a_pagar, 0, '', '', fecha_emision, data_origin);
     END fn_factura_cp_tralix;
 
     FUNCTION fn_notacred_tralix(
