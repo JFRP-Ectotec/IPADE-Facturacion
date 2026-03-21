@@ -559,8 +559,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         vln_pidm SPRIDEN.SPRIDEN_PIDM%TYPE;
         numLineas NUMBER := 0;
         concepto TY_TRALIX_LINEA_05;
+        numGrupo VARCHAR2(1 CHAR);
     BEGIN
         vln_pidm := gb_common.f_get_pidm(matricula);
+        SELF.raiz_debug := 'TY_TRALIX_COMPPAGO';
 
         SELECT COUNT(*)
         INTO numLineas
@@ -635,10 +637,39 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         -- SELF.estatus_debug := 'A';
         SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'formaPago: '||formaPago);
         --     ' tranNumber:'||tranNumberCP||' tranNumberOrig:'||tranOriginal);
-        SELF.estatus_debug := 'I';
+        -- SELF.estatus_debug := 'I';
 
         SELF.compPagos := TY_TRALIX_LINEA_COMPPAGOS(vln_pidm, tranNumber, tranOriginal, idPagos, formaPago);
         numLineas := numLineas + 1;
+
+        /* En caso de que sea extranjero con RFC genérico mandar banco de ordenanza */
+        SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'rfc: '||SELF.receptor.rfc||' formaPago:'||formaPago);
+        IF (SELF.receptor.rfc = 'XEXX010101000' AND formaPago IN ('03', '04', '28', '29')) THEN
+            SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'pidm: '||vln_pidm);
+
+            FOR k IN (
+                SELECT substr(goradid_adid_code, 1, 1) as NumGrupo
+                FROM goradid
+                WHERE goradid_pidm = vln_pidm
+                    AND goradid_additional_id LIKE '*%'
+            ) LOOP
+                numGrupo := k.numGrupo;
+                SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'numGrupo: '||numGrupo);
+                
+                FOR j IN (
+                    SELECT goradid_additional_id
+                    FROM goradid
+                    WHERE goradid_pidm = vln_pidm
+                        AND goradid_adid_code = numGrupo||'NBO'
+                ) LOOP
+                    SELF.compPagos.NomBancoOrdExt := j.goradid_additional_id;
+                    SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'banco: '||j.goradid_additional_id);
+                END LOOP;
+            END LOOP;
+        END IF;
+
+        SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'bancoExt: '||SELF.compPagos.NomBancoOrdExt);
+        SELF.estatus_debug := 'I';
 
         SELF.compTotales := TY_TRALIX_LINEA_COMPTOT(vln_pidm, tranNumber, tranOriginal);
         numLineas := numLineas + 1;
