@@ -183,26 +183,34 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
         SELF.totTrasladosBaseIVAEx := NULL;
 
         /* Obtener monto de la transacción Banner */
-        SELECT tbraccd_amount, tbraccd_receipt_number
-        INTO monto, recibo
-        FROM tbraccd
-        WHERE tbraccd_pidm = pidm
-            AND tbraccd_tran_number = tranNumberCP
-        ;
+        FOR i IN (
+            SELECT tbraccd_amount, tbraccd_receipt_number
+            INTO monto, recibo
+            FROM tbraccd
+            WHERE tbraccd_pidm = pidm
+                AND tbraccd_tran_number = tranNumberCP
+        ) LOOP
+            monto := i.tbraccd_amount;
+            recibo := i.tbraccd_receipt_number;
+        END LOOP;
+        
 
         /* Ver si hay impuestos */
-        -- SELECT NVL(SUM(tbraccd_amount), 0)
-        -- INTO totImpuestos
-        -- FROM tbraccd t
-        -- WHERE tbraccd_pidm = pidm
-        --     AND tbraccd_tran_number != tranNumberCP
-        --     AND tbraccd_receipt_number = recibo
-        --     AND tbraccd_srce_code = 'Z'
-        -- ;
+        SELECT NVL(SUM(tbraccd_amount), 0)
+        INTO totImpuestos
+        FROM tbraccd t
+        WHERE tbraccd_pidm = pidm
+            AND tbraccd_tran_number != tranNumberCP
+            AND tbraccd_receipt_number = recibo
+            AND tbraccd_detail_code LIKE '%IVA%'
+        ;
 
         SELF.montoTotalPagos := monto;
-        SELF.totTrasladosBaseIVA16 := monto / 1.16;
-        SELF.totTrasladosImpIVA16 := monto - SELF.totTrasladosBaseIVA16;
+        IF (NVL(totImpuestos, 0) > 0) THEN
+            -- SELF.totTrasladosBaseIVA16 := monto / 1.16;
+            SELF.totTrasladosBaseIVA16 := totImpuestos;
+            SELF.totTrasladosImpIVA16 := monto - SELF.totTrasladosBaseIVA16;
+        END IF;
 
         IF (NVL(SELF.totTrasladosBaseIVA16, 0) <= 0) THEN
             SELF.totTrasladosBaseIVAEx := monto;
@@ -592,7 +600,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             EXIT;
         END LOOP;
 
-        SELF.estatus_debug := 'O';
+        SELF.estatus_debug := 'A';
         SELF.envio_automatico := ty_tralix_linea_09(matricula);
         SELF.registrar_debug('TY_TRALIX_COMPPAGO', SELF.envio_automatico.imprimir_linea);
 
