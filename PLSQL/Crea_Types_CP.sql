@@ -353,12 +353,13 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
         END LOOP;
 
         FOR j IN (
-            SELECT tbraccd_amount
+            SELECT tbraccd_balance, tbraccd_amount
             FROM tbraccd
             WHERE tbraccd_pidm = pidm
                 AND tbraccd_tran_number = tranOriginal
         ) LOOP
-            SELF.impSaldoAnt := j.tbraccd_amount;
+            SELF.impSaldoAnt := j.tbraccd_balance;
+            -- SELF.impSaldoAnt := SELF.impSaldoAnt + SELF.impPagado; -- Esta suma se hace porque en Banner ya se aplicaron las sumas antes de enviar.
         END LOOP;
 
         SELECT COUNT(*) + 1
@@ -537,7 +538,8 @@ CREATE OR REPLACE TYPE TY_TRALIX_COMPPAGO AS OBJECT
         numEntidad VARCHAR2,
         difEmpresa VARCHAR2,
         formaPago VARCHAR2,
-        metodoPago VARCHAR2
+        metodoPago VARCHAR2,
+        fechaEmision DATE
     ) RETURN SELF AS RESULT,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
     MEMBER PROCEDURE ajustar_pubgral,
@@ -553,7 +555,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         numEntidad VARCHAR2,
         difEmpresa VARCHAR2,
         formaPago VARCHAR2,
-        metodoPago VARCHAR2
+        metodoPago VARCHAR2,
+        fechaEmision DATE
     ) RETURN SELF AS RESULT IS
         idPagos VARCHAR2(50 CHAR);
         vln_pidm SPRIDEN.SPRIDEN_PIDM%TYPE;
@@ -612,7 +615,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         END IF;
         
         SELF.info_gral_comprobante := ty_tralix_linea_01(vln_pidm, tranNumber, 
-            numEntidad, difEmpresa, metodoPago, formaPago, NULL, 'XXX');
+            numEntidad, difEmpresa, metodoPago, formaPago, fechaEmision, 'XXX');
         SELF.info_gral_comprobante.metodoPago := '';
         SELF.info_gral_comprobante.formaPago := '';
         SELF.info_gral_comprobante.tipoComprobante := 'P';

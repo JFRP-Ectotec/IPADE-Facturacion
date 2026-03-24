@@ -252,27 +252,27 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
             SELF.lugarExpedicion := q.spraddr_zip;
         END LOOP;
 
-        SELF.fecha := fechaEmision;
-        FOR i IN (
-            SELECT t.tbraccd_amount, t.tbraccd_effective_date
-            FROM tbraccd t
-            WHERE t.tbraccd_pidm = pidm
-                AND t.tbraccd_tran_number = tranNumber
-        ) LOOP
-            SELF.totalNum := i.tbraccd_amount;
-            IF (procesoFactura = 'NDC') THEN
-                SELF.totalNum := ABS(i.tbraccd_amount);
-            END IF;
-            SELF.totalLetra := GZKNUMB.monto_escrito(SELF.totalNum);
-            IF (procesoFactura = 'CP') THEN
-                SELF.totalLetra := '';
-            END IF;
+        SELF.fecha := NVL(fechaEmision, SYSDATE);
+        -- FOR i IN (
+        --     SELECT t.tbraccd_amount, t.tbraccd_effective_date
+        --     FROM tbraccd t
+        --     WHERE t.tbraccd_pidm = pidm
+        --         AND t.tbraccd_tran_number = tranNumber
+        -- ) LOOP
+        --     SELF.totalNum := i.tbraccd_amount;
+        --     IF (procesoFactura = 'NDC') THEN
+        --         SELF.totalNum := ABS(i.tbraccd_amount);
+        --     END IF;
+        --     SELF.totalLetra := GZKNUMB.monto_escrito(SELF.totalNum);
+        --     IF (procesoFactura = 'CP') THEN
+        --         SELF.totalLetra := '';
+        --     END IF;
             
-            IF (SELF.fecha IS NULL) THEN
-                SELF.fecha := i.tbraccd_effective_date;
-            END IF;
-            -- SELF.fecha := i.tbraccd_effective_date - 6/24;
-        END LOOP;
+        --     IF (SELF.fecha IS NULL) THEN
+        --         SELF.fecha := i.tbraccd_effective_date;
+        --     END IF;
+        --     -- SELF.fecha := i.tbraccd_effective_date - 6/24;
+        -- END LOOP;
 
         -- FOR j IN (
         --     SELECT tbracdt_text
@@ -950,11 +950,9 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
                     -- AND tbraccd_srce_code = 'Z'
                 ;
 
-                dbms_output.put_line('VU2');
                 SELF.valorUnitario := i.tbraccd_amount - totImpuestos;
                 SELF.importe := SELF.valorUnitario;
             ELSE
-                dbms_output.put_line('VU3');
                 SELF.valorUnitario := ABS(i.tbraccd_amount);
                 SELF.importe := ABS(SELF.valorUnitario);
             END IF;
@@ -1962,7 +1960,6 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             END LOOP;
 
             concepto := TY_TRALIX_LINEA_05(pidm, tranNumber, 'XXX');
-            dbms_output.put_line('VU1');
             concepto.valorUnitario := vln_subTotal + vln_sumaImpuestos;
             concepto.importe := vln_subTotal;
 

@@ -23,6 +23,7 @@ CREATE OR REPLACE PACKAGE TZTRALX IS
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE',  /* Valores válidos 'PUE', 'PPD' */
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE;
 
@@ -685,6 +686,12 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                 RETURN vlt_respuesta;
         END;
 
+        IF (tipo_pago_banner = '00') THEN
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error('EL tipo de pago no es valor válido.');
+            RETURN vlt_respuesta;   
+        END IF;
+
         vlt_respuesta.validar_datos;
 
         IF (vlt_respuesta.estatus != 'OK') THEN
@@ -881,7 +888,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             -- vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
             vlc_tipo_pago_banner := tipo_pago_banner;
             datosCompPago := ty_tralix_comppago(matricula, tran_number, vln_tran_number_orig,
-                vlc_num_entidad, 1, vlc_tipo_pago_banner, tipo_pago_facturar);
+                vlc_num_entidad, 1, vlc_tipo_pago_banner, tipo_pago_facturar, fecha_emision);
             datosCompPago.validar;
             IF (datosCompPago.errores.COUNT > 0) THEN
                 vlt_respuesta.estatus := 'ERROR';
@@ -1085,12 +1092,14 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         tipo_pago_banner IN VARCHAR2 DEFAULT '99',
         tipo_pago_facturar IN VARCHAR2 DEFAULT 'PUE', 
         etiqueta IN VARCHAR2 DEFAULT 'FAC',
+        fecha_emision IN DATE,
         data_origin IN VARCHAR2 DEFAULT 'LOCAL')
         RETURN TY_TRALIX_ENVIOFAC_RESPONSE IS
         vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
     BEGIN
         pr_registrar_debug('fn_factura_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
-            ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar);
+            ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar
+            ||' fecha_emision:'||fecha_emision);
 
         IF (NVL(matricula, '|') = '|' OR LENGTH(matricula) < 2
             OR NVL(tran_number, 0) = 0) THEN
@@ -1102,7 +1111,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         RETURN fn_factura_base_tralix(matricula, tran_number, NVL(tipo_pago_banner, '99'),
             NVL(tipo_pago_facturar, 'PUE'), NVL(etiqueta, 'FAC'), 'DEF', 0, 0,
-            '', '', NULL, data_origin);
+            '', '', fecha_emision, data_origin);
     END fn_factura_tralix;
 
     FUNCTION fn_factura_tralix_json(
