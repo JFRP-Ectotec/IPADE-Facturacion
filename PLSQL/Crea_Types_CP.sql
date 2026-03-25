@@ -352,15 +352,35 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
             SELF.impPagado := i.tbraccd_amount * SELF.equivalenciaDR;
         END LOOP;
 
+        dbms_output.put_line('impPagado:'||SELF.impPagado);
+
         FOR j IN (
-            SELECT tbraccd_balance, tbraccd_amount
+            SELECT tbraccd_balance, tbraccd_amount, tbraccd_receipt_number
             FROM tbraccd
             WHERE tbraccd_pidm = pidm
                 AND tbraccd_tran_number = tranOriginal
         ) LOOP
             SELF.impSaldoAnt := j.tbraccd_balance;
             -- SELF.impSaldoAnt := SELF.impSaldoAnt + SELF.impPagado; -- Esta suma se hace porque en Banner ya se aplicaron las sumas antes de enviar.
+
+            IF (SELF.impSaldoAnt = 0) THEN
+                SELF.impSaldoAnt := j.tbraccd_amount;
+            END IF;
+
+            /* Ver si hay impuestos */
+            FOR k IN (
+                SELECT SUM(tbraccd_amount) as impuestos
+                FROM tbraccd
+                WHERE tbraccd_pidm = pidm
+                    AND tbraccd_tran_number != tranOriginal
+                    AND tbraccd_receipt_number = j.tbraccd_receipt_number
+                    AND tbraccd_detail_code LIKE '%IVA%'
+            ) LOOP
+                SELF.impSaldoAnt := SELF.impSaldoAnt + k.impuestos;
+            END LOOP;
         END LOOP;
+
+        dbms_output.put_line('impSaldoAnt:'||SELF.impSaldoAnt);
 
         SELECT COUNT(*) + 1
         INTO SELF.numParcialidad

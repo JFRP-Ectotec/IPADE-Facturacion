@@ -36,21 +36,21 @@ WHERE t1.tbraccd_pidm = gb_common.f_get_pidm('A00085344')
 
 SELECT *
 FROM TVRTSTA
-WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085344') -- gb_common.f_get_pidm('A00085149')
-	AND tvrtsta_tran_number = 26
-	AND (tvrtsta_tsta_code LIKE 'F0%'
-		OR tvrtsta_tsta_code LIKE 'T0%')
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085398') -- gb_common.f_get_pidm('A00085149')
+	AND tvrtsta_tran_number = 13
 ;
 
 SELECT translate(' example ', chr(10) || chr(13) || chr(09), ' ') 
 FROM dual
 ;
 
-SELECT tbraccd_tran_number, tbraccd_detail_code, tbraccd_amount,
-	tbraccd_balance, tbraccd_receipt_number, tbraccd_srce_code
+
+SELECT tbraccd_pidm, tbraccd_tran_number, tbraccd_detail_code, 
+	tbraccd_amount, tbraccd_balance, tbraccd_effective_date, tbraccd_receipt_number,
+	tbraccd_tran_number_paid
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085277')
-	AND tbraccd_tran_number IN (231, 232, 233)
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085398')
+	AND tbraccd_tran_number IN (12, 13, 14)
 ;
 
 SELECT tzrpofi_docnum_pos, tzrpofi_activity_date, tzrpofi_iac_cde
@@ -63,11 +63,11 @@ ORDER BY tzrpofi_activity_date DESC
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085277';
-	tran_number NUMBER := 227;
+	matricula VARCHAR2(20 CHAR) := 'A00085398';
+	tran_number NUMBER := 14;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 218;
+	tran_original NUMBER := 13;
 	tran_impuestos NUMBER := NULL;
 	desc_original VARCHAR2(100 CHAR) := 'S';
 	fecha_emision DATE := TO_DATE('23-MAR-2026', 'DD-MON-YYYY');
@@ -130,28 +130,22 @@ COMMIT;
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE  gurdbug_value LIKE '%mat%A00085296%tran%38%'
+WHERE /*gurdbug_value LIKE '%mat%A00085398%tran_number:13%'
     -- AND gurdbug_parm LIKE '%TZTRALX%'
-    --AND*/  gurdbug_activity_date > TO_DATE('23-MAR-2026 12:17:00', 'DD-MON-YYYY HH24:MI:SS')
-    -- AND gurdbug_activity_date < TO_DATE('23-MAR-2026 12:19:00', 'DD-MON-YYYY HH24:MI:SS') 
+    --AND*/  gurdbug_activity_date > TO_DATE('24-MAR-2026 18:50:00', 'DD-MON-YYYY HH24:MI:SS')
+    AND gurdbug_activity_date < TO_DATE('24-MAR-2026 18:52:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
+	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
 ;
 
 SELECT tbrappl_chg_tran_number
 FROM tbrappl
-WHERE tbrappl_pidm = gb_common.f_get_pidm('A00085277')
+WHERE tbrappl_pidm = gb_common.f_get_pidm('A00085398')
 	AND tbrappl_pay_tran_number = 171
 	AND tbrappl_reappl_ind IS NULL
 ;
 
-SELECT tbraccd_pidm, tbraccd_tran_number, tbraccd_detail_code, 
-	tbraccd_amount, tbraccd_balance, tbraccd_effective_date, tbraccd_receipt_number,
-	tbraccd_tran_number_paid
-FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085277')
-	AND tbraccd_tran_number IN (218, 219)
-;
 
 SELECT tvrtsta_seq_no, tvrtsta_tsta_code, tvrtsta_dloc_code
 FROM tvrtsta
