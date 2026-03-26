@@ -360,23 +360,47 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
             WHERE tbraccd_pidm = pidm
                 AND tbraccd_tran_number = tranOriginal
         ) LOOP
-            SELF.impSaldoAnt := j.tbraccd_balance;
+            -- SELF.impSaldoAnt := j.tbraccd_balance;
+            SELF.impSaldoAnt := j.tbraccd_amount;
             -- SELF.impSaldoAnt := SELF.impSaldoAnt + SELF.impPagado; -- Esta suma se hace porque en Banner ya se aplicaron las sumas antes de enviar.
 
-            IF (SELF.impSaldoAnt = 0) THEN
-                SELF.impSaldoAnt := j.tbraccd_amount;
-            END IF;
+            -- IF (SELF.impSaldoAnt = 0) THEN
+            --     SELF.impSaldoAnt := j.tbraccd_amount;
+            -- END IF;
+
+            dbms_output.put_line('impSaldoAnt 2:'||SELF.impSaldoAnt);
+
+            /* Ver si hay complementos */
+            FOR m IN (
+                SELECT NVL(SUM(tc.tbraccd_amount), 0) as parciales
+                FROM tvrtsta ta JOIN tzrpofi tz
+                    ON (ta.tvrtsta_pidm = tz.tzrpofi_pidm
+                        AND ta.tvrtsta_comments = tz.tzrpofi_iac_cde)
+                    JOIN tbraccd tc ON (tc.tbraccd_pidm = tz.tzrpofi_pidm
+                        AND tc.tbraccd_tran_number = tz.tzrpofi_docnum_pos)
+                WHERE ta.tvrtsta_pidm = pidm
+                    AND ta.tvrtsta_tran_number = tranOriginal
+                    AND REGEXP_LIKE (ta.tvrtsta_tsta_code, 'UI\d')
+            ) LOOP
+                IF (m.parciales > 0) THEN
+                    SELF.impSaldoAnt := SELF.impSaldoAnt - m.parciales;
+                END IF;
+            END LOOP;
 
             /* Ver si hay impuestos */
             FOR k IN (
-                SELECT SUM(tbraccd_amount) as impuestos
+                SELECT NVL(SUM(tbraccd_amount), 0) as impuestos
                 FROM tbraccd
                 WHERE tbraccd_pidm = pidm
                     AND tbraccd_tran_number != tranOriginal
                     AND tbraccd_receipt_number = j.tbraccd_receipt_number
                     AND tbraccd_detail_code LIKE '%IVA%'
             ) LOOP
-                SELF.impSaldoAnt := SELF.impSaldoAnt + k.impuestos;
+                dbms_output.put_line('impuestos:'||k.impuestos);
+                IF (k.impuestos > 0) THEN
+                    SELF.impSaldoAnt := SELF.impSaldoAnt + k.impuestos;
+                    -- SELF.impSaldoAnt := j.tbraccd_balance + k.impuestos;
+                END IF;
             END LOOP;
         END LOOP;
 
@@ -403,7 +427,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
         --     SELF.numParcialidad := m.numParcialidades + 1;
         -- END LOOP;
 
-        SELF.impSaldoInsoluto := SELF.impSaldoAnt - SELF.impPagado;
+        SELF.impSaldoInsoluto := NVL(SELF.impSaldoAnt, 0) - NVL(SELF.impPagado, 0);
 
         FOR k IN (
             SELECT TZRPOFI_IAC_CDE, TZRPOFI_SDOC_CODE,
@@ -692,12 +716,13 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         END IF;
 
         SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'bancoExt: '||SELF.compPagos.NomBancoOrdExt);
-        SELF.estatus_debug := 'I';
 
         SELF.compTotales := TY_TRALIX_LINEA_COMPTOT(vln_pidm, tranNumber, tranOriginal);
         numLineas := numLineas + 1;
 
         SELF.doctoRel := TY_TRALIX_LINEA_COMPDOCTREL(vln_pidm, tranNumber, tranOriginal, idPagos, SELF.compPagos.MonedaP);
+        SELF.registrar_debug('TY_TRALIX_LINEA_COMPPAGO', 'doctoRel: '||SELF.doctoRel.imprimir_linea);
+        SELF.estatus_debug := 'I';
         numLineas := numLineas + 1;
 
         SELF.conceptos := TY_TRALIX_ARR_05();

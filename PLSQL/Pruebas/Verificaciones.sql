@@ -49,9 +49,29 @@ SELECT tbraccd_pidm, tbraccd_tran_number, tbraccd_detail_code,
 	tbraccd_amount, tbraccd_balance, tbraccd_effective_date, tbraccd_receipt_number,
 	tbraccd_tran_number_paid
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085398')
-	AND tbraccd_tran_number IN (12, 13, 14)
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085277')
+	AND tbraccd_tran_number IN (329, 330, 331)
+	-- AND tbraccd_receipt_number IN (2586)
 ;
+
+SELECT NVL(SUM(tc.tbraccd_amount), 0)
+FROM tvrtsta ta JOIN tzrpofi tz
+	ON (ta.tvrtsta_pidm = tz.tzrpofi_pidm
+		AND ta.tvrtsta_comments = tz.tzrpofi_iac_cde)
+	JOIN tbraccd tc ON (tc.tbraccd_pidm = tz.tzrpofi_pidm
+		AND tc.tbraccd_tran_number = tz.tzrpofi_docnum_pos)
+WHERE ta.tvrtsta_pidm = gb_common.f_get_pidm('A00085277')
+	AND ta.tvrtsta_tran_number = 329
+	AND REGEXP_LIKE (ta.tvrtsta_tsta_code, 'UI\d')
+;
+
+SELECT * FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085277')
+	AND tvrtsta_tran_number = 329
+	-- AND tvrtsta_seq_no = 21
+;
+
+COMMIT;
 
 SELECT tzrpofi_docnum_pos, tzrpofi_activity_date, tzrpofi_iac_cde
 FROM tzrpofi
@@ -63,21 +83,21 @@ ORDER BY tzrpofi_activity_date DESC
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085398';
-	tran_number NUMBER := 14;
+	matricula VARCHAR2(20 CHAR) := 'A00085277';
+	tran_number NUMBER := 331;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 13;
+	tran_original NUMBER := 329;
 	tran_impuestos NUMBER := NULL;
 	desc_original VARCHAR2(100 CHAR) := 'S';
-	fecha_emision DATE := TO_DATE('23-MAR-2026', 'DD-MON-YYYY');
+	fecha_emision DATE := TO_DATE('25-MAR-2026', 'DD-MON-YYYY');
 BEGIN
 	-- vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD',
 	-- 	'FAC',  tran_original, tran_impuestos, desc_original, fecha_emision, 'DEBUG');
 	-- vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '03', 'PUE', 'FAC',
 	-- 	'DEBUG');
 	-- vlt_respuesta := ipadedev.tztralx.fn_cancela_tralix(matricula, tran_number, '01');
-    vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '03', 'CDP', 
+    vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '02', 'CDP', 
 		tran_original, fecha_emision, 'DEBUG');
 	-- vlt_respuesta := TZTRALX.fn_notacred_tralix(matricula, tran_number, '01', 'PUE',
 	-- 	'FAC', tran_original, 'DEBUG');
@@ -130,10 +150,10 @@ COMMIT;
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE /*gurdbug_value LIKE '%mat%A00085398%tran_number:13%'
+WHERE /*gurdbug_value LIKE '%mat%A00085277%tran_number:321%'
     -- AND gurdbug_parm LIKE '%TZTRALX%'
-    --AND*/  gurdbug_activity_date > TO_DATE('24-MAR-2026 18:50:00', 'DD-MON-YYYY HH24:MI:SS')
-    AND gurdbug_activity_date < TO_DATE('24-MAR-2026 18:52:00', 'DD-MON-YYYY HH24:MI:SS') 
+    --AND*/  gurdbug_activity_date > TO_DATE('25-MAR-2026 17:15:00', 'DD-MON-YYYY HH24:MI:SS')
+    AND gurdbug_activity_date < TO_DATE('25-MAR-2026 17:17:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
 	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
@@ -251,4 +271,22 @@ SELECT *
                 FROM goradid
                 WHERE goradid_pidm = 105417
                     AND goradid_additional_id LIKE '*%'
+;
+
+SELECT tf1.tzrpofi_pidm, tf1.tzrpofi_docnum_pos, tf1.tzrpofi_iac_cde
+FROM tzrpofi tf1
+WHERE tf1.tzrpofi_pidm = :PIDM
+	AND tf1.tzrpofi_docnum_pos = :TRAN_NUMBER_BANNER
+	AND NVL(tf1.tzrpofi_iac_cde, '|') != '|' 
+    AND tf1.tzrpofi_activity_date =
+    (SELECT MAX(tf2.tzrpofi_activity_date)
+    FROM tzrpofi tf2
+    WHERE tf2.tzrpofi_pidm = tf1.tzrpofi_pidm
+        AND tf2.tzrpofi_docnum_pos = tf1.tzrpofi_docnum_pos
+		AND NVL(tf2.tzrpofi_iac_cde, '|') != '|')
+;
+
+SELECT *
+FROM spriden
+WHERE spriden_id = 'A00085429'
 ;

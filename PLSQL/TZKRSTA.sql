@@ -26,6 +26,12 @@ CREATE OR REPLACE PACKAGE TZKRSTA IS
         tran_number IN NUMBER,
         motivo_canc IN VARCHAR2) 
         RETURN VARCHAR2;
+
+    /* FUNCTION fn_determina_sigNumero(
+        pidm IN NUMBER,
+        tran_number IN NUMBER,
+        inicio_codigo IN VARCHAR2)
+        RETURN VARCHAR2; */
 END TZKRSTA;
 /
 show errors;
@@ -596,7 +602,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
                 AND tvrtsta_tran_number = tran_number_orig
             ;
 
-            vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number, 'UI');
+            vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number_orig, 'UI');
 
             INSERT INTO TAISMGR.TVRTSTA (
                 TVRTSTA_PIDM, TVRTSTA_TRAN_NUMBER, TVRTSTA_SEQ_NO, 
