@@ -18,40 +18,22 @@ EXCEPTION
         dbms_output.put_line('2)'||sqlerrm);
 END;
 
-SELECT t1.tbraccd_detail_code, t1.tbraccd_tran_number, t1.tbraccd_receipt_number
-FROM tbraccd t1
-WHERE t1.tbraccd_pidm = gb_common.f_get_pidm('A00085344')
-	AND t1.tbraccd_tran_number != 27
-	AND t1.tbraccd_detail_code = 'FANT'
-	AND EXISTS
-	(
-		SELECT 1
-		FROM tbraccd t2
-		WHERE t2.tbraccd_pidm = t1.tbraccd_pidm
-			AND t2.tbraccd_receipt_number = t1.tbraccd_receipt_number
-			AND t2.tbraccd_tran_number = 27
-	)
-;
-
-
-SELECT *
-FROM TVRTSTA
-WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085398') -- gb_common.f_get_pidm('A00085149')
-	AND tvrtsta_tran_number = 13
-;
-
-SELECT translate(' example ', chr(10) || chr(13) || chr(09), ' ') 
-FROM dual
-;
-
-
 SELECT tbraccd_pidm, tbraccd_tran_number, tbraccd_detail_code, 
-	tbraccd_amount, tbraccd_balance, tbraccd_effective_date, tbraccd_receipt_number,
-	tbraccd_tran_number_paid
+	tbraccd_amount, /*tbraccd_balance, tbraccd_effective_date,*/ tbraccd_receipt_number,
+	tbraccd_tran_number_paid, tbraccd_payment_id
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085277')
-	AND tbraccd_tran_number IN (329, 330, 331)
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085298')
+	AND tbraccd_tran_number IN (25, 24, 23)
 	-- AND tbraccd_receipt_number IN (2586)
+;
+
+SELECT tb2.tbraccd_amount as impuestos
+                FROM tbraccd tb1
+                    JOIN tbraccd tb2 ON (
+                        tb1.tbraccd_pidm = tb2.tbraccd_pidm
+                        AND tb1.tbraccd_payment_id = tb2.tbraccd_tran_number)    
+                WHERE tb1.tbraccd_pidm = gb_common.f_get_pidm('A00085298')
+                    AND tb1.tbraccd_tran_number = 24
 ;
 
 SELECT NVL(SUM(tc.tbraccd_amount), 0)
@@ -83,11 +65,11 @@ ORDER BY tzrpofi_activity_date DESC
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085277';
-	tran_number NUMBER := 331;
+	matricula VARCHAR2(20 CHAR) := 'A00085298';
+	tran_number NUMBER := 25;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 329;
+	tran_original NUMBER := 24;
 	tran_impuestos NUMBER := NULL;
 	desc_original VARCHAR2(100 CHAR) := 'S';
 	fecha_emision DATE := TO_DATE('25-MAR-2026', 'DD-MON-YYYY');
@@ -97,7 +79,7 @@ BEGIN
 	-- vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '03', 'PUE', 'FAC',
 	-- 	'DEBUG');
 	-- vlt_respuesta := ipadedev.tztralx.fn_cancela_tralix(matricula, tran_number, '01');
-    vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '02', 'CDP', 
+    vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '03', 'CDP', 
 		tran_original, fecha_emision, 'DEBUG');
 	-- vlt_respuesta := TZTRALX.fn_notacred_tralix(matricula, tran_number, '01', 'PUE',
 	-- 	'FAC', tran_original, 'DEBUG');
@@ -115,16 +97,6 @@ BEGIN
 	END IF;
 END;
 
-SELECT *
-FROM TVRTSTA
-WHERE TVRTSTA_PIDM = gb_common.f_get_pidm('A00085277')
-	AND tvrtsta_TRAN_NUMBER = 98
-	AND tvrtsta_tsta_code LIKE 'FV%'
-;
-
-
-SELECT TO_CHAR(2, '00000') from dual;
-
 
 -- Verificar estatus transacción
 SELECT tvrtsta_pidm, tvrtsta_tsta_code, tvrtsta_tran_number,
@@ -137,23 +109,13 @@ WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085149')
 
 COMMIT;
 
-DELETE FROM tvrtsta
-WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085128')
-	AND tvrtsta_tran_number = 6
-	AND tvrtsta_tsta_code IN ('T02', 'F02', 'FV2', 'FP2',
-		'T03', 'F03', 'FV3', 'FP3')
-    -- AND tvrtsta_tsta_code = 'PC1'
-;
-
-COMMIT;
-
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE /*gurdbug_value LIKE '%mat%A00085277%tran_number:321%'
+WHERE /*gurdbug_value LIKE '%mat%A00085298%'
     -- AND gurdbug_parm LIKE '%TZTRALX%'
-    --AND*/  gurdbug_activity_date > TO_DATE('25-MAR-2026 17:15:00', 'DD-MON-YYYY HH24:MI:SS')
-    AND gurdbug_activity_date < TO_DATE('25-MAR-2026 17:17:00', 'DD-MON-YYYY HH24:MI:SS') 
+    --AND*/  gurdbug_activity_date > TO_DATE('25-MAR-2026 22:11:00', 'DD-MON-YYYY HH24:MI:SS')
+    AND gurdbug_activity_date < TO_DATE('25-MAR-2026 22:14:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
 	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
@@ -211,19 +173,6 @@ WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085155')
 
 COMMIT;
 
-SELECT *
-FROM tvrtsta
-WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085149')
-	AND tvrtsta_tran_number = 35
-;
-
-UPDATE tvrtsta
-SET tvrtsta_dloc_code = '02'
-WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085149')
-	AND tvrtsta_tran_number = 35
-	AND tvrtsta_tsta_code = 'CA1'
-;
-
 COMMIT;
 
 -- Para poder cancelar
@@ -232,11 +181,6 @@ COMMIT;
 -- D6CCE11C-5D26-4A40-B4F9-33A773F13BFA
 
 COMMIT;
-
-SELECT *
-FROM spriden
-WHERE spriden_pidm = 105094 
-;
 
 DECLARE
 	vlc_respuesta VARCHAR2(500 CHAR);
@@ -247,46 +191,6 @@ BEGIN
 	dbms_output.put_line(vlc_respuesta);
 END;
 
-
-SELECT SUBSTR('CANCELADO_SIN_ACEPTACION', 1, 9), LENGTH('CANCELADO_SIN_ACEPTACION')
-FROM dual
-;
-
-COMMIT;
-
 SELECT *
-FROM goradid
-WHERE goradid_pidm = 105348
---	AND*/ goradid_additional_id LIKE 'XEXX%'
-ORDER BY goradid_adid_code
-;
-
-SELECT *
-FROM goradid
-WHERE goradid_pidm = gb_common.f_get_pidm('A00085344')
-	--AND goradid_additional_id LIKE '*%'
-;
-
-SELECT *
-                FROM goradid
-                WHERE goradid_pidm = 105417
-                    AND goradid_additional_id LIKE '*%'
-;
-
-SELECT tf1.tzrpofi_pidm, tf1.tzrpofi_docnum_pos, tf1.tzrpofi_iac_cde
-FROM tzrpofi tf1
-WHERE tf1.tzrpofi_pidm = :PIDM
-	AND tf1.tzrpofi_docnum_pos = :TRAN_NUMBER_BANNER
-	AND NVL(tf1.tzrpofi_iac_cde, '|') != '|' 
-    AND tf1.tzrpofi_activity_date =
-    (SELECT MAX(tf2.tzrpofi_activity_date)
-    FROM tzrpofi tf2
-    WHERE tf2.tzrpofi_pidm = tf1.tzrpofi_pidm
-        AND tf2.tzrpofi_docnum_pos = tf1.tzrpofi_docnum_pos
-		AND NVL(tf2.tzrpofi_iac_cde, '|') != '|')
-;
-
-SELECT *
-FROM spriden
-WHERE spriden_id = 'A00085429'
+FROM tvrtpdc
 ;

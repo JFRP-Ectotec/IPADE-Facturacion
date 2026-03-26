@@ -946,8 +946,18 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
                 WHERE tbraccd_pidm = pidm
                     AND tbraccd_tran_number != tranNumber
                     AND tbraccd_receipt_number = i.tbraccd_receipt_number
-                    AND tbraccd_detail_code LIKE '%IVA%'  /* TODO: Ajustar a query dentro de SORXREF */
-                    -- AND tbraccd_srce_code = 'Z'
+                    AND tbraccd_detail_code IN
+                    (
+                        SELECT DISTINCT t3.tvrtpdc_detc_code
+                        FROM 
+                            (SELECT DISTINCT sorxref_banner_value
+                            FROM sorxref s1
+                            WHERE sorxref_xlbl_code = 'IMPUESTO') plan_imp
+                            JOIN tvvtxpr t1 ON (plan_imp.sorxref_banner_value = t1.tvvtxpr_code)
+                            JOIN tvrtxpr t2 ON (t1.tvvtxpr_code = t2.tvrtxpr_code)
+                            JOIN tvrtpdc t3 ON (t1.tvvtxpr_code = t3.tvrtpdc_txpr_code)
+                        WHERE SYSDATE between t2.tvrtxpr_date_from AND NVL(t2.tvrtxpr_date_to, TO_DATE('31-12-2099', 'DD-MM-YYYY'))
+                    )
                 ;
 
                 SELF.valorUnitario := i.tbraccd_amount - totImpuestos;
@@ -1829,8 +1839,18 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
                 WHERE tbraccd_pidm = pidm
                     AND tbraccd_tran_number != tranNumber
                     AND tbraccd_receipt_number = j.tbraccd_receipt_number
-                    AND tbraccd_detail_code LIKE '%IVA%'  /* TODO: Ajustar a query dentro de SORXREF */
-                --    AND tbraccd_srce_code = 'Z'
+                    AND tbraccd_detail_code IN
+                    (
+                        SELECT DISTINCT t3.tvrtpdc_detc_code
+                        FROM 
+                            (SELECT DISTINCT sorxref_banner_value
+                            FROM sorxref s1
+                            WHERE sorxref_xlbl_code = 'IMPUESTO') plan_imp
+                            JOIN tvvtxpr t1 ON (plan_imp.sorxref_banner_value = t1.tvvtxpr_code)
+                            JOIN tvrtxpr t2 ON (t1.tvvtxpr_code = t2.tvrtxpr_code)
+                            JOIN tvrtpdc t3 ON (t1.tvvtxpr_code = t3.tvrtpdc_txpr_code)
+                        WHERE SYSDATE between t2.tvrtxpr_date_from AND NVL(t2.tvrtxpr_date_to, TO_DATE('31-12-2099', 'DD-MM-YYYY'))
+                    )
                 ;
             END IF;
 

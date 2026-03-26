@@ -196,20 +196,35 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
         
 
         /* Ver si hay impuestos */
-        SELECT NVL(SUM(tbraccd_amount), 0)
-        INTO totImpuestos
-        FROM tbraccd t
-        WHERE tbraccd_pidm = pidm
-            AND tbraccd_tran_number != tranNumberCP
-            AND tbraccd_receipt_number = recibo
-            AND tbraccd_detail_code LIKE '%IVA%'
-        ;
+        -- SELECT NVL(SUM(tbraccd_amount), 0)
+        -- INTO totImpuestos
+        -- FROM tbraccd t
+        -- WHERE tbraccd_pidm = pidm
+        --     AND tbraccd_tran_number != tranNumberCP
+        --     AND tbraccd_receipt_number = recibo
+        --     AND tbraccd_detail_code LIKE '%IVA%'
+        -- ;
+        
+        FOR j IN (
+            SELECT tb2.tbraccd_amount
+            FROM tbraccd tb1
+                JOIN tbraccd tb2 ON (
+                    tb1.tbraccd_pidm = tb2.tbraccd_pidm
+                    AND tb1.tbraccd_payment_id = tb2.tbraccd_tran_number)    
+            WHERE tb1.tbraccd_pidm = pidm
+                AND tb1.tbraccd_tran_number = tranOriginal
+        ) LOOP
+            totImpuestos := j.tbraccd_amount;
+        END LOOP;
 
         SELF.montoTotalPagos := monto;
         IF (NVL(totImpuestos, 0) > 0) THEN
             -- SELF.totTrasladosBaseIVA16 := monto / 1.16;
-            SELF.totTrasladosBaseIVA16 := totImpuestos;
-            SELF.totTrasladosImpIVA16 := monto - SELF.totTrasladosBaseIVA16;
+            -- SELF.totTrasladosBaseIVA16 := totImpuestos;
+            -- SELF.totTrasladosImpIVA16 := monto - SELF.totTrasladosBaseIVA16;
+
+            SELF.totTrasladosBaseIVA16 := monto - totImpuestos;
+            SELF.totTrasladosImpIVA16 := totImpuestos;
         END IF;
 
         IF (NVL(SELF.totTrasladosBaseIVA16, 0) <= 0) THEN
@@ -389,12 +404,19 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
 
             /* Ver si hay impuestos */
             FOR k IN (
-                SELECT NVL(SUM(tbraccd_amount), 0) as impuestos
+                /*SELECT NVL(SUM(tbraccd_amount), 0) as impuestos
                 FROM tbraccd
                 WHERE tbraccd_pidm = pidm
                     AND tbraccd_tran_number != tranOriginal
                     AND tbraccd_receipt_number = j.tbraccd_receipt_number
-                    AND tbraccd_detail_code LIKE '%IVA%'
+                    AND tbraccd_detail_code LIKE '%IVA%' */
+                SELECT tb2.tbraccd_amount as impuestos
+                FROM tbraccd tb1
+                    JOIN tbraccd tb2 ON (
+                        tb1.tbraccd_pidm = tb2.tbraccd_pidm
+                        AND tb1.tbraccd_payment_id = tb2.tbraccd_tran_number)    
+                WHERE tb1.tbraccd_pidm = pidm
+                    AND tb1.tbraccd_tran_number = tranOriginal
             ) LOOP
                 dbms_output.put_line('impuestos:'||k.impuestos);
                 IF (k.impuestos > 0) THEN
