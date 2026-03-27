@@ -939,14 +939,49 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
             WHERE t.tbraccd_pidm = pidm
                 AND t.tbraccd_tran_number = tranNumber
         ) LOOP
-            IF (procesoFactura != 'NDC') THEN
-                SELECT NVL(SUM(tbraccd_amount), 0)
+            IF (procesoFactura = 'NDC') THEN
+                SELF.valorUnitario := ABS(i.tbraccd_amount);
+                SELF.importe := ABS(SELF.valorUnitario);
+            ELSIF (procesoFactura IN ('FST', 'ANT')) THEN
+                /* Para facturas anticipadas, la transacción de impuestos está en el PAYMENT_ID */
+                FOR m IN (
+                    SELECT tb2.tbraccd_amount
+                    FROM tbraccd tb1
+                        JOIN tbraccd tb2 ON (
+                            tb1.tbraccd_pidm = tb2.tbraccd_pidm
+                            AND tb1.tbraccd_payment_id = tb2.tbraccd_tran_number)
+                    WHERE tb1.tbraccd_pidm = pidm
+                        AND tb1.tbraccd_tran_number = tranNumber
+                        AND tb2.tbraccd_detail_code IN
+                        (
+                            SELECT DISTINCT t3.tvrtpdc_detc_code
+                            FROM 
+                                (SELECT DISTINCT sorxref_banner_value
+                                FROM sorxref s1
+                                WHERE sorxref_xlbl_code = 'IMPUESTO') plan_imp
+                                JOIN tvvtxpr t1 ON (plan_imp.sorxref_banner_value = t1.tvvtxpr_code)
+                                JOIN tvrtxpr t2 ON (t1.tvvtxpr_code = t2.tvrtxpr_code)
+                                JOIN tvrtpdc t3 ON (t1.tvvtxpr_code = t3.tvrtpdc_txpr_code)
+                            WHERE SYSDATE between t2.tvrtxpr_date_from AND NVL(t2.tvrtxpr_date_to, TO_DATE('31-12-2099', 'DD-MM-YYYY'))
+                        )
+                ) LOOP
+                    totImpuestos := m.tbraccd_amount;
+                END LOOP;
+
+                SELF.valorUnitario := i.tbraccd_amount - NVL(totImpuestos, 0);
+                SELF.importe := SELF.valorUnitario;
+            ELSE
+                /* Buscar por códigos de detalle de impuestos dentro de transacciones con el mismo recibo */
+                SELECT NVL(SUM(tb2.tbraccd_amount), 0) as impuestos
                 INTO totImpuestos
-                FROM tbraccd t
-                WHERE tbraccd_pidm = pidm
-                    AND tbraccd_tran_number != tranNumber
-                    AND tbraccd_receipt_number = i.tbraccd_receipt_number
-                    AND tbraccd_detail_code IN
+                FROM tbraccd tb1
+                    JOIN tbraccd tb2 ON (
+                        tb1.tbraccd_pidm = tb2.tbraccd_pidm
+                        AND tb1.tbraccd_receipt_number = tb2.tbraccd_receipt_number)
+                WHERE tb1.tbraccd_pidm = pidm
+                    AND tb1.tbraccd_tran_number = tranNumber
+                    AND tb2.tbraccd_tran_number != tranNumber
+                    AND tb2.tbraccd_detail_code IN
                     (
                         SELECT DISTINCT t3.tvrtpdc_detc_code
                         FROM 
@@ -960,11 +995,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_05 AS
                     )
                 ;
 
-                SELF.valorUnitario := i.tbraccd_amount - totImpuestos;
+                SELF.REGISTRAR_DEBUG('linea_05', 'totImpuestos 3:'||totImpuestos);
+
+                SELF.valorUnitario := i.tbraccd_amount - NVL(totImpuestos, 0);
                 SELF.importe := SELF.valorUnitario;
-            ELSE
-                SELF.valorUnitario := ABS(i.tbraccd_amount);
-                SELF.importe := ABS(SELF.valorUnitario);
             END IF;
         END LOOP;
 
@@ -1608,7 +1642,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
         SELF.impuestosRets := TY_TRALIX_ARR_07();
         SELF.errores := TY_TRALIX_ARR_ERROR();
 
-        IF (procesoFactura = 'ANT') THEN
+        IF (procesoFactura IN ('ANT', 'FST')) THEN
             impuestos_anticipada(vln_pidm, tranNumber, tranFantImpuestos,
                 totalCargos, impTrasladados);
             ajusta_conceptos(vln_pidm, tranOriginalAntic, adicional);

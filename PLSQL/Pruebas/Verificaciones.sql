@@ -22,9 +22,9 @@ SELECT tbraccd_pidm, tbraccd_tran_number, tbraccd_detail_code,
 	tbraccd_amount, /*tbraccd_balance, tbraccd_effective_date,*/ tbraccd_receipt_number,
 	tbraccd_tran_number_paid, tbraccd_payment_id
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085298')
-	AND tbraccd_tran_number IN (25, 24, 23)
-	-- AND tbraccd_receipt_number IN (2586)
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085402')
+	-- AND tbraccd_tran_number IN (15)
+	AND tbraccd_receipt_number IN (2655)
 ;
 
 SELECT tb2.tbraccd_amount as impuestos
@@ -65,26 +65,29 @@ ORDER BY tzrpofi_activity_date DESC
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085298';
-	tran_number NUMBER := 25;
+	matricula VARCHAR2(20 CHAR) := 'A00085402';
+	tran_number NUMBER := 15;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 24;
-	tran_impuestos NUMBER := NULL;
+	tran_original NUMBER := 44;
+	tran_impuestos NUMBER := 48;
 	desc_original VARCHAR2(100 CHAR) := 'S';
-	fecha_emision DATE := TO_DATE('25-MAR-2026', 'DD-MON-YYYY');
+	fecha_emision DATE := TO_DATE('26-MAR-2026', 'DD-MON-YYYY');
+	tipo_pago VARCHAR2(10 CHAR) := '04';
+	pago_factura VARCHAR2(10 CHAR) := 'PUE';
+	data_origin VARCHAR2(50 CHAR) := 'DEBUG';
 BEGIN
 	-- vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD',
 	-- 	'FAC',  tran_original, tran_impuestos, desc_original, fecha_emision, 'DEBUG');
-	-- vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, '03', 'PUE', 'FAC',
-	-- 	'DEBUG');
+	vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, tipo_pago, 
+		pago_factura, 'FAC', fecha_emision, data_origin);
 	-- vlt_respuesta := ipadedev.tztralx.fn_cancela_tralix(matricula, tran_number, '01');
-    vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '03', 'CDP', 
-		tran_original, fecha_emision, 'DEBUG');
+    -- vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '03', 'CDP', 
+	-- 	tran_original, fecha_emision, 'DEBUG');
 	-- vlt_respuesta := TZTRALX.fn_notacred_tralix(matricula, tran_number, '01', 'PUE',
 	-- 	'FAC', tran_original, 'DEBUG');
 	-- vlt_respuesta := TZTRALX.fn_factsust_tralix(matricula, tran_number, '01', 'PUE',
-	-- 	'FAC', matricula, tran_original, tran_impuestos, 'DEBUG');
+	-- 	'FAC', matricula, tran_original, tran_impuestos, NULL, 'DEBUG');
 
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	IF (vlt_respuesta.errores.COUNT > 0) THEN
@@ -112,10 +115,10 @@ COMMIT;
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE /*gurdbug_value LIKE '%mat%A00085298%'
-    -- AND gurdbug_parm LIKE '%TZTRALX%'
-    --AND*/  gurdbug_activity_date > TO_DATE('25-MAR-2026 22:11:00', 'DD-MON-YYYY HH24:MI:SS')
-    AND gurdbug_activity_date < TO_DATE('25-MAR-2026 22:14:00', 'DD-MON-YYYY HH24:MI:SS') 
+WHERE /* gurdbug_value LIKE '%matricula:A00085402%'
+    --AND gurdbug_parm LIKE '%fn_factsust%'
+    --AND*/  gurdbug_activity_date > TO_DATE('26-MAR-2026 23:24:00', 'DD-MON-YYYY HH24:MI:SS')
+    AND gurdbug_activity_date < TO_DATE('26-MAR-2026 23:26:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
 	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
@@ -193,4 +196,84 @@ END;
 
 SELECT *
 FROM tvrtpdc
+;
+
+SELECT *
+FROM goradid
+WHERE /*goradid_adid_code LIKE 'RS%'
+	AND*/ goradid_additional_id LIKE '%STEEL%'
+;
+
+SELECT *
+FROM goradid
+WHERE goradid_pidm = 105356
+;
+
+-- Revisar luego el calculo de impuestos.
+DECLARE
+	datos_banner CLOB;
+	matricula VARCHAR2(20 CHAR) := 'A00085463';
+	tran_number NUMBER := 16;
+	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
+	num_linea NUMBER := 1;
+	tran_original NUMBER := 19;
+	tran_impuestos NUMBER := NULL;
+	desc_original VARCHAR2(100 CHAR) := 'S';
+	fecha_emision DATE := TO_DATE('25-MAR-2026', 'DD-MON-YYYY');
+BEGIN
+	vlt_respuesta := TZTRALX.fn_sustitucion_tralix(matricula, tran_number, 
+		matricula, 'CDP', 
+		tran_original, fecha_emision, 'DEBUG');
+	
+	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
+	IF (vlt_respuesta.errores.COUNT > 0) THEN
+		dbms_output.put_line(vlt_respuesta.errores.COUNT || ' errores');
+		FOR m IN vlt_respuesta.errores.FIRST .. vlt_respuesta.errores.LAST
+		LOOP
+			dbms_output.put_line(num_linea || ' - ' ||vlt_respuesta.errores(m).mensaje);
+			num_linea := num_linea + 1;
+		END LOOP;
+	END IF;
+END;
+
+SELECT NVL(SUM(tbraccd_amount), 0),
+	MAX(tbraccd_detail_code)
+FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085402')
+	AND tbraccd_tran_number != 15
+	AND tbraccd_receipt_number = 2655
+	AND tbraccd_detail_code IN
+	(
+		SELECT DISTINCT t3.tvrtpdc_detc_code
+		FROM 
+			(SELECT DISTINCT sorxref_banner_value
+			FROM sorxref s1
+			WHERE sorxref_xlbl_code = 'IMPUESTO') plan_imp
+			JOIN tvvtxpr t1 ON (plan_imp.sorxref_banner_value = t1.tvvtxpr_code)
+			JOIN tvrtxpr t2 ON (t1.tvvtxpr_code = t2.tvrtxpr_code)
+			JOIN tvrtpdc t3 ON (t1.tvvtxpr_code = t3.tvrtpdc_txpr_code)
+		WHERE SYSDATE between t2.tvrtxpr_date_from AND NVL(t2.tvrtxpr_date_to, TO_DATE('31-12-2099', 'DD-MM-YYYY'))
+	)
+;
+
+SELECT tb2.tbraccd_amount
+FROM tbraccd tb1
+	JOIN tbraccd tb2 ON (
+		tb1.tbraccd_pidm = tb2.tbraccd_pidm
+		AND tb1.tbraccd_receipt_number = tb2.tbraccd_receipt_number)
+WHERE tb1.tbraccd_pidm = gb_common.f_get_pidm('A00085402')
+	AND tb1.tbraccd_tran_number = 15
+	AND tb2.tbraccd_tran_number != 15
+	AND tb2.tbraccd_detail_code IN
+	(
+		SELECT DISTINCT t3.tvrtpdc_detc_code
+		FROM 
+			(SELECT DISTINCT sorxref_banner_value
+			FROM sorxref s1
+			WHERE sorxref_xlbl_code = 'IMPUESTO') plan_imp
+			JOIN tvvtxpr t1 ON (plan_imp.sorxref_banner_value = t1.tvvtxpr_code)
+			JOIN tvrtxpr t2 ON (t1.tvvtxpr_code = t2.tvrtxpr_code)
+			JOIN tvrtpdc t3 ON (t1.tvvtxpr_code = t3.tvrtpdc_txpr_code)
+		WHERE SYSDATE between t2.tvrtxpr_date_from AND NVL(t2.tvrtxpr_date_to, TO_DATE('31-12-2099', 'DD-MM-YYYY'))
+	)
 ;
