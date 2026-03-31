@@ -22,9 +22,9 @@ SELECT tbraccd_pidm, tbraccd_tran_number, tbraccd_detail_code,
 	tbraccd_amount, /*tbraccd_balance, tbraccd_effective_date,*/ tbraccd_receipt_number,
 	tbraccd_tran_number_paid, tbraccd_payment_id
 FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085402')
-	-- AND tbraccd_tran_number IN (15)
-	AND tbraccd_receipt_number IN (2655)
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00085020')
+	AND tbraccd_tran_number IN (469, 467, 466)
+	-- AND tbraccd_receipt_number IN (2655)
 ;
 
 SELECT tb2.tbraccd_amount as impuestos
@@ -55,9 +55,9 @@ WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085277')
 
 COMMIT;
 
-SELECT tzrpofi_docnum_pos, tzrpofi_activity_date, tzrpofi_iac_cde
+SELECT tzrpofi_doc_number, tzrpofi_docnum_pos, tzrpofi_activity_date, tzrpofi_iac_cde
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085277')
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085510')
 --	AND tzrpofi_docnum_pos = 64
 ORDER BY tzrpofi_activity_date DESC
 ;
@@ -65,16 +65,16 @@ ORDER BY tzrpofi_activity_date DESC
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085402';
-	tran_number NUMBER := 15;
+	matricula VARCHAR2(20 CHAR) := 'A00085463';
+	tran_number NUMBER := 476;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 44;
+	tran_original NUMBER := 467;
 	tran_impuestos NUMBER := 48;
 	desc_original VARCHAR2(100 CHAR) := 'S';
-	fecha_emision DATE := TO_DATE('26-MAR-2026', 'DD-MON-YYYY');
+	fecha_emision DATE := TO_DATE('30-MAR-2026', 'DD-MON-YYYY');
 	tipo_pago VARCHAR2(10 CHAR) := '04';
-	pago_factura VARCHAR2(10 CHAR) := 'PUE';
+	pago_factura VARCHAR2(10 CHAR) := 'PPD';
 	data_origin VARCHAR2(50 CHAR) := 'DEBUG';
 BEGIN
 	-- vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD',
@@ -115,10 +115,10 @@ COMMIT;
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE /* gurdbug_value LIKE '%matricula:A00085402%'
-    --AND gurdbug_parm LIKE '%fn_factsust%'
-    --AND*/  gurdbug_activity_date > TO_DATE('26-MAR-2026 23:24:00', 'DD-MON-YYYY HH24:MI:SS')
-    AND gurdbug_activity_date < TO_DATE('26-MAR-2026 23:26:00', 'DD-MON-YYYY HH24:MI:SS') 
+WHERE gurdbug_value LIKE '%matricula:A00085489%'   -- 85489
+    AND gurdbug_parm LIKE '%TZTRALX%fn_%'
+    -- AND  gurdbug_activity_date > TO_DATE('31-MAR-2026 10:50:00', 'DD-MON-YYYY HH24:MI:SS')
+    --AND gurdbug_activity_date < TO_DATE('31-MAR-2026 10:46:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
 	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
@@ -145,9 +145,9 @@ SELECT tzrpofi_pidm, tzrpofi_sdoc_code, tzrpofi_docnum_pos, tzrpofi_doc_number,
 	TO_CHAR(tzrpofi_activity_date, 'DD-MON-YYYY HH24:MI:SS') as tzrpofi_activity_date,
 	TO_CHAR(tzrpofi_pdf_date, 'DD-MON-YYYY HH24:MI:SS') as tzrpofi_pdf_date
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085294')
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085489')
 	-- AND tzrpofi_doc_number IN ('9989', '9993')
-	-- AND tzrpofi_docnum_pos = 3
+--	AND tzrpofi_docnum_pos = 476
 	-- tzrpofi_iac_cde = '47ADBBEB-BDD6-4B33-B51B-CED5587A0657'
 ;
 
@@ -206,7 +206,7 @@ WHERE /*goradid_adid_code LIKE 'RS%'
 
 SELECT *
 FROM goradid
-WHERE goradid_pidm = 105356
+WHERE goradid_pidm = gb_common.f_get_pidm('A00085510')
 ;
 
 -- Revisar luego el calculo de impuestos.
@@ -277,3 +277,9 @@ WHERE tb1.tbraccd_pidm = gb_common.f_get_pidm('A00085402')
 		WHERE SYSDATE between t2.tvrtxpr_date_from AND NVL(t2.tvrtxpr_date_to, TO_DATE('31-12-2099', 'DD-MM-YYYY'))
 	)
 ;
+
+SELECT *
+FROM user_objects
+WHERE status = 'INVALID'
+;
+

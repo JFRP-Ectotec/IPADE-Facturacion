@@ -356,7 +356,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         -- Obtener valores para llamar a webservices
         FOR h IN (
             SELECT TO_CHAR(GTVSDAX_COMMENTS) as valor
-            FROM general.gtvsdax
+            FROM gtvsdax
             WHERE gtvsdax_external_code = 'MICROSERV'
                 AND gtvsdax_internal_code = 'INTG_IPADE'
                 AND gtvsdax_internal_code_group = 'WALLET_L'
@@ -366,7 +366,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         FOR j IN (
             SELECT TO_CHAR(GTVSDAX_COMMENTS) as valor
-            FROM general.gtvsdax
+            FROM gtvsdax
             WHERE gtvsdax_external_code = 'MICROSERV'
                 AND gtvsdax_internal_code = 'INTG_IPADE'
                 AND gtvsdax_internal_code_group = 'WALLET_P'
@@ -376,7 +376,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         FOR i IN (
             SELECT TO_CHAR(GTVSDAX_COMMENTS) as valor
-            FROM general.gtvsdax
+            FROM gtvsdax
             WHERE gtvsdax_external_code = 'MICROSERV'
                 AND gtvsdax_internal_code = 'INTG_IPADE'
                 AND gtvsdax_internal_code_group = 'INTEGR_TX'
@@ -537,7 +537,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         -- pr_registrar_debug('pr_log_error', 'TVRPAYS_SRV_CODE: '||tipo_pago_banner);
         -- pr_registrar_debug('pr_log_error', 'TVRPAYS_RETURN_CODE: '||TO_CHAR(tran_number));
 
-        MERGE INTO TAISMGR.TVRPAYS tgt
+        MERGE INTO TVRPAYS tgt
             USING (
                 SELECT vln_pidm as TVRPAYS_PIDM,
                     NVL(vln_numFactura, 'NO_TRAN') as TVRPAYS_BANK_TRAN_ID,
@@ -638,11 +638,11 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlc_prefijo VARCHAR2(20 CHAR);
         vln_numFactura NUMBER;
 
-        vlc_camp_code  SATURN.STVCAMP.STVCAMP_CODE%TYPE;
+        vlc_camp_code  STVCAMP.STVCAMP_CODE%TYPE;
         vlc_num_entidad VARCHAR2(1 CHAR);
         vlc_num_tipoDir VARCHAR2(1 CHAR);
         vlc_objeto_principal CLOB;
-        vln_pidm SATURN.SPRIDEN.SPRIDEN_PIDM%TYPE;
+        vln_pidm SPRIDEN.SPRIDEN_PIDM%TYPE;
 
         vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
         vlc_envioTralix CLOB;
@@ -1019,7 +1019,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             -- pr_registrar_debug('fn_factura_base_tralix', 'UUID_Value:'||uuidTralix);
 
             BEGIN
-                INSERT INTO TAISMGR.TZRPOFI (
+                INSERT INTO TZRPOFI (
                     TZRPOFI_PIDM, TZRPOFI_SDOC_CODE, TZRPOFI_DOC_NUMBER, TZRPOFI_DOC_STATUS, TZRPOFI_TERM_CODE, 
                     TZRPOFI_DCAT_CODE, TZRPOFI_IAC_CDE, TZRPOFI_INCL_BARCODE_IND, TZRPOFI_INCL_PI_IND, 
                     TZRPOFI_PI_IND, TZRPOFI_INCL_DOCNUM_IND, TZRPOFI_DOCNUM_POS, TZRPOFI_EXP_PDF_LBL_1,

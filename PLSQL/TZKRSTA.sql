@@ -175,7 +175,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
                 AND tvrtsta_tran_number = tran_number
             ;
 
-            INSERT INTO TAISMGR.TVRTSTA (
+            INSERT INTO TVRTSTA (
                 TVRTSTA_PIDM, TVRTSTA_TRAN_NUMBER, TVRTSTA_SEQ_NO, 
                 TVRTSTA_TSTA_CODE, TVRTSTA_DATE_TSTA, 
                 TVRTSTA_DLOC_CODE, TVRTSTA_COMMENTS, 
@@ -604,7 +604,7 @@ CREATE OR REPLACE PACKAGE BODY TZKRSTA IS
 
             vlc_seqCodigo := fn_determina_sigNumero(pidm, tran_number_orig, 'UI');
 
-            INSERT INTO TAISMGR.TVRTSTA (
+            INSERT INTO TVRTSTA (
                 TVRTSTA_PIDM, TVRTSTA_TRAN_NUMBER, TVRTSTA_SEQ_NO, 
                 TVRTSTA_TSTA_CODE, TVRTSTA_DATE_TSTA, 
                 TVRTSTA_DLOC_CODE, TVRTSTA_COMMENTS, 
