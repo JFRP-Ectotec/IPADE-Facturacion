@@ -8,7 +8,7 @@ CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP2_SEQ START WITH 6125 INCREMENT BY 1 MINV
 
 DROP SEQUENCE IPADEDEV.TEST_TRALIX_IP1_SEQ;
 
-CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP1_SEQ START WITH 8000 INCREMENT BY 1 MINVALUE 0 NOCYCLE NOCACHE NOORDER; 
+CREATE SEQUENCE IPADEDEV.TEST_TRALIX_IP1_SEQ START WITH 12519 INCREMENT BY 1 MINVALUE 0 NOCYCLE NOCACHE NOORDER; 
 
 SELECT test_tralix_ip2_seq.nextval from dual;
 
@@ -461,6 +461,10 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         -- Determinar status de la respuesta
         l_indice := INSTR(l_response, l_statusCodeTag);
+
+        IF (l_indice < 1) THEN
+            RETURN l_response;
+        END IF;
         l_ind_fin := INSTR(l_response, ',', l_indice);
 
         l_indice := l_indice + LENGTH(l_statusCodeTag);
@@ -1514,7 +1518,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pr_registrar_debug('fn_factura_ant_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar
             ||' tran_number_original:'||tran_number_original||' tran_number_imp:'||tran_number_imp
-            ||' desc_adicional:'||desc_adicional||' fecha_emision:'||TO_CHAR(fecha_emision, 'DD-MON-YYYY'));
+            ||' desc_adicional:'||desc_adicional||' fecha_emision:'||TO_CHAR(fecha_emision, 'DD-MON-YYYY HH24:MI:SS'));
 
         IF (NVL(matricula, '|') = '|' OR LENGTH(matricula) < 2
             OR NVL(tran_number, 0) = 0) THEN

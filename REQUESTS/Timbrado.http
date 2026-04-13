@@ -1,0 +1,7 @@
+POST https://api-process-poc.azure-api.net/facturacion/v1/generaCFDI HTTP/1.1
+Host: api-process-poc.azure-api.net
+auth-key: dXNlcl8yMDI1XzAxX2ZhY3Q6V2lVWTdhOFhlNW1BUGdNTjY4U2Y=
+auth-process-key-facturacion: 6d84a847cb564338994f987e895ef220
+Content-Type: application/json
+
+{"idEmpresa": "472529fa-1b6a-42b5-bb99-15f19feff522" ,"idTipoCfd": "585087f1c503fff95e94fdebe7ace250" ,"idSucursal": "4f96a4aaa817086dace8f96c48b0c4b4" ,"nombre": "A00085020_469.txt" ,"archivoFuente": "00|A00085020_000469.txt|PPD|4.0|\n01|ZPB11847|ZPB|11847|2026-03-30T18:10:40|0|0||||||XXX||||||P||02080||||01||\n03|XAXX010101000|XAXX010101000|SOCIEDAD PANAMERICANA DE ESTUDIOS EMPRESARIALES|MÃ©xico|AV AZCAPOTZALCO,|145|12|CLAVERIA|Azcapotzalco||Azcapotzalco|Ciudad de MÃ©xico|02080|||CP01|610|Pago x2 Complemento|A00085020|AD|\n05|84111506||1|Pago|0|0||ACT||Linea_1|01|\ncompPagos|A00085020_000469|2.0|2026-03-30T18:10:40|03|MXN|1|100.00|||||||||||\ncompTotales||||100.00|16.00||||||100.00|\ncomPagosDoctoRel|A00085020_000469|873AF57E-9843-4C53-953D-EB1589F5C09E|ZPB|11846|MXN|1|1|464.00|100.00|364.00|02|A00085020_000469|\ncomPagosImpTrasladosDR|A00085020_000469|100.00|002|Tasa|0.160000|16.00\ncomPagosImpTrasladosP|A00085020_000469|100.00|002|Tasa|0.160000|16.00|\n09|XAXX010101000|correoenviofac@gmail.com|CFDI IPADE de A00085020|||\n99|11"}

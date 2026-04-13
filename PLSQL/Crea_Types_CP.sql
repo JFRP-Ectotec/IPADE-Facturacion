@@ -212,7 +212,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
                     tb1.tbraccd_pidm = tb2.tbraccd_pidm
                     AND tb1.tbraccd_payment_id = tb2.tbraccd_tran_number)    
             WHERE tb1.tbraccd_pidm = pidm
-                AND tb1.tbraccd_tran_number = tranOriginal
+                AND tb1.tbraccd_tran_number = tranNumberCP --tranOriginal
         ) LOOP
             totImpuestos := j.tbraccd_amount;
         END LOOP;
@@ -794,6 +794,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
             + SELF.impuestos_DR.COUNT + SELF.impuestos_P.COUNT;
 
         SELF.info_gral_comprobante.set_cargos(0, NULL);
+        SELF.info_gral_comprobante.totalLetra := '';
         SELF.info_gral_comprobante.tipoCambio := '';
 
         numLineas := numLineas + 1;

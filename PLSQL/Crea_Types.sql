@@ -224,6 +224,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
         contNota NUMBER := 1;
+        fechaActual DATE;
     BEGIN
         SELECT self INTO parent FROM dual;
         parent.INIT('01');
@@ -252,7 +253,16 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
             SELF.lugarExpedicion := q.spraddr_zip;
         END LOOP;
 
-        SELF.fecha := NVL(fechaEmision, SYSDATE);
+        fechaActual := SYSDATE;
+        IF (fechaEmision IS NULL) THEN
+            SELF.fecha := fechaActual;
+        ELSIF (fechaEmision > fechaActual) THEN
+            SELF.fecha := fechaActual;
+        ELSE
+            SELF.fecha := fechaEmision;
+        END IF;
+        -- SELF.fecha := NVL(fechaEmision, SYSDATE);
+
         -- FOR i IN (
         --     SELECT t.tbraccd_amount, t.tbraccd_effective_date
         --     FROM tbraccd t
@@ -302,6 +312,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
         self.totalNum := cargos - NVL(self.descuento, 0) + NVL(self.taxesTrasladados, 0) 
             + NVL(self.taxesRetenidos, 0);
         -- SELF.tipoCambio := 1;
+        SELF.totalLetra := GZKNUMB.monto_escrito(SELF.totalNum);
     END set_cargos;
 
     MEMBER PROCEDURE set_folio(serie VARCHAR2, folio VARCHAR2) IS
