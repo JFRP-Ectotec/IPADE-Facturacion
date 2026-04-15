@@ -305,7 +305,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
 
     MEMBER PROCEDURE set_cargos(cargos NUMBER, imp_ret NUMBER) IS
     BEGIN
-        self.taxesTrasladados := imp_ret;
+        self.taxesTrasladados := NULL;
+        IF (imp_ret > 0) THEN
+            self.taxesTrasladados := imp_ret;
+        END IF;
         self.descuento := NULL;
         self.taxesRetenidos := NULL;
         self.subTotalNum := cargos;
@@ -331,8 +334,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_01 AS
             SELF.format_fecha(SELF.fecha) || SELF.sep ||
             SELF.format_moneda(SELF.subTotalNum) || SELF.sep ||
             SELF.format_moneda(SELF.totalNum) || SELF.sep ||
-            --SELF.format_moneda(SELF.taxesTrasladados) || SELF.sep ||
-            TRIM(TO_CHAR(SELF.taxesTrasladados, '9999999990.00')) || SELF.sep ||
+            SELF.format_moneda(SELF.taxesTrasladados) || SELF.sep ||
+            --TRIM(TO_CHAR(SELF.taxesTrasladados, '9999999990.00')) || SELF.sep ||
             SELF.format_moneda(SELF.taxesRetenidos) || SELF.sep ||
             SELF.format_moneda(SELF.descuento) || SELF.sep ||
             SELF.sanitizar(SELF.motivoDescuento) || SELF.sep ||
