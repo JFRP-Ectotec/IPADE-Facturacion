@@ -57,24 +57,24 @@ COMMIT;
 
 SELECT tzrpofi_doc_number, tzrpofi_docnum_pos, tzrpofi_activity_date, tzrpofi_iac_cde
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085510')
---	AND tzrpofi_docnum_pos = 64
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085531')
+	AND tzrpofi_docnum_pos = 6
 ORDER BY tzrpofi_activity_date DESC
 ;
 
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085463';
-	tran_number NUMBER := 476;
+	matricula VARCHAR2(20 CHAR) := 'A00085516';
+	tran_number NUMBER := 17;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 467;
-	tran_impuestos NUMBER := 48;
+	tran_original NUMBER := 12;
+	tran_impuestos NUMBER := 9;
 	desc_original VARCHAR2(100 CHAR) := 'S';
-	fecha_emision DATE := TO_DATE('30-MAR-2026', 'DD-MON-YYYY');
-	tipo_pago VARCHAR2(10 CHAR) := '04';
-	pago_factura VARCHAR2(10 CHAR) := 'PPD';
+	fecha_emision DATE := TO_DATE('13-APR-2026', 'DD-MON-YYYY');
+	tipo_pago VARCHAR2(10 CHAR) := '03';
+	pago_factura VARCHAR2(10 CHAR) := 'PUE';
 	data_origin VARCHAR2(50 CHAR) := 'DEBUG';
 BEGIN
 	-- vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD',
@@ -112,16 +112,25 @@ WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085149')
 
 COMMIT;
 
+SELECT TO_CHAR(SYSDATE, 'DD-MON-YYYY HH24:MI:SS')
+from dual;
+
+SELECT TEST_TRALIX_IP1_SEQ.NEXTVAL FROM DUAL;
+
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE gurdbug_value LIKE '%matricula:A00085489%'   -- 85489
-    AND gurdbug_parm LIKE '%TZTRALX%fn_%'
-    -- AND  gurdbug_activity_date > TO_DATE('31-MAR-2026 10:50:00', 'DD-MON-YYYY HH24:MI:SS')
-    --AND gurdbug_activity_date < TO_DATE('31-MAR-2026 10:46:00', 'DD-MON-YYYY HH24:MI:SS') 
+WHERE gurdbug_value LIKE '%matricula:A00085516%'   -- 85489
+    AND gurdbug_parm LIKE '%TZTRALX%'
+    --AND*/ gurdbug_activity_date > TO_DATE('13-APR-2026 16:45:00', 'DD-MON-YYYY HH24:MI:SS')
+    --AND gurdbug_activity_date < TO_DATE('13-APR-2026 16:47:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
 	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
+;
+
+SELECT TO_CHAR(SYSDATE, 'DD-MON-YYYY HH24:MI:SS')
+FROM dual
 ;
 
 SELECT tbrappl_chg_tran_number
@@ -145,7 +154,7 @@ SELECT tzrpofi_pidm, tzrpofi_sdoc_code, tzrpofi_docnum_pos, tzrpofi_doc_number,
 	TO_CHAR(tzrpofi_activity_date, 'DD-MON-YYYY HH24:MI:SS') as tzrpofi_activity_date,
 	TO_CHAR(tzrpofi_pdf_date, 'DD-MON-YYYY HH24:MI:SS') as tzrpofi_pdf_date
 FROM tzrpofi
-WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085489')
+WHERE tzrpofi_pidm = gb_common.f_get_pidm('A00085519')
 	-- AND tzrpofi_doc_number IN ('9989', '9993')
 --	AND tzrpofi_docnum_pos = 476
 	-- tzrpofi_iac_cde = '47ADBBEB-BDD6-4B33-B51B-CED5587A0657'
@@ -162,8 +171,8 @@ SELECT LENGTH(NVL(TZRPOFI_IAC_CDE, ''))
 SELECT tvrpays_return_code_desc, tvrpays_return_code, 
 	TO_CHAR(tvrpays_activity_date, 'DD-MON-YYYY HH24:MI:SS')
 FROM tvrpays
-WHERE tvrpays_pidm = gb_common.f_get_pidm('A00085277')
-	AND tvrpays_return_code = 221
+WHERE tvrpays_pidm = gb_common.f_get_pidm('A00085519')
+--	AND tvrpays_return_code IN (3, 4, 5)
 ;
 
 
@@ -283,3 +292,12 @@ FROM user_objects
 WHERE status = 'INVALID'
 ;
 
+
+SELECT INSTR('Resp RAW:<html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center></center>
+</body>
+</html>
+', '"statusCode":') FROM dual;

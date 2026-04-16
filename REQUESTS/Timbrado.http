@@ -1,0 +1,7 @@
+POST https://api-process-poc.azure-api.net/facturacion/v1/generaCFDI HTTP/1.1
+Host: api-process-poc.azure-api.net
+auth-key: dXNlcl8yMDI1XzAxX2ZhY3Q6V2lVWTdhOFhlNW1BUGdNTjY4U2Y=
+auth-process-key-facturacion: 6d84a847cb564338994f987e895ef220
+Content-Type: application/json
+
+{"idEmpresa": "6dfcc2bf-734f-4b36-961c-a23f62569870" ,"idTipoCfd": "d67da01f379a3f1497e9a58f035d9697" ,"idSucursal": "40aec84a3811b3d1be3d2cd9763dcc9f" ,"nombre": "A00085516_17.txt" ,"archivoFuente": "00|A00085516_17.txt|FAC|4.0|\n01|PBA13007|PBA|13007|2026-04-13T16:45:27|500.00|500.00|||||QUINIENTOS PESOS CON 00/100|MXN|1|||||I|PUE|02080||03||01||\n03|MAGG961111GU9|MAGG961111GU9|GETSEMANI MADRIGAL GARCIA|MÃ©xico|OAXACA|3||BENITO JUÁREZ|Temixco||Temixco|Morelos|62593|||G03|621|IP1 Clonado|A00085516|MEDE_MY|\n05|86121702||1|Capacitación Maestría en Dirección de Empresa|500.00|500.00||E48||Linea_1|02|\n05C|Linea_1|500.00|002|Exento|||\n06|002|||Exento|500.00|\n09|MAGG961111GU9|jolivares@ectotec.com|CFDI IPADE de A00085516|||\n99|8" }
