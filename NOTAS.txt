@@ -9,3 +9,11 @@ Crea_types_CP - TYPE BODY TY_TRALIX_COMPPAGO
 Crea_types - TYPE BODY LINEA_03
   TYPE BODY LINEA_05
   Type Body TY_TRALIX_FACTURA
+
+  
+https://wiki.tralix.com/books/xsa---manual-del-api/page/informaci%C3%B3n-t%C3%A9nica
+
+https://wiki.tralix.com/books/xsa---manual-del-api/page/api-xml
+
+
+https://wiki.tralix.com/books/xsa---manual-del-api/page/api-asincrona
