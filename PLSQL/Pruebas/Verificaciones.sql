@@ -120,10 +120,10 @@ SELECT TEST_TRALIX_IP1_SEQ.NEXTVAL FROM DUAL;
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE gurdbug_value LIKE '%matricula:A00085516%'   -- 85489
+WHERE gurdbug_value LIKE '%A00085470%'   -- 85489
     AND gurdbug_parm LIKE '%TZTRALX%'
-    --AND*/ gurdbug_activity_date > TO_DATE('13-APR-2026 16:45:00', 'DD-MON-YYYY HH24:MI:SS')
-    --AND gurdbug_activity_date < TO_DATE('13-APR-2026 16:47:00', 'DD-MON-YYYY HH24:MI:SS') 
+    --AND gurdbug_activity_date > TO_DATE('17-APR-2026 11:40:00', 'DD-MON-YYYY HH24:MI:SS')
+    --AND gurdbug_activity_date < TO_DATE('17-APR-2026 11:42:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
 	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
@@ -301,3 +301,13 @@ SELECT INSTR('Resp RAW:<html>
 </body>
 </html>
 ', '"statusCode":') FROM dual;
+
+
+SELECT *
+FROM tvrtsta
+WHERE tvrtsta_tsta_code = 'RCL'
+ORDER BY tvrtsta_activity_date DESC
+;
+
+SELECT host, lower_port, upper_port, acl
+FROM   dba_network_acls;

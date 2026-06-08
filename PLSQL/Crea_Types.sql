@@ -1455,7 +1455,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_09 AS
                 SELECT g.goremal_email_address
                 FROM goremal g
                 WHERE g.goremal_pidm = gb_common.f_get_pidm(matricula)
-                    AND g.goremal_emal_code = 'INS'
+                    AND g.goremal_emal_code = 'INST'
                 ORDER BY g.goremal_activity_date DESC
             ) LOOP
                 correo := j.goremal_email_address;

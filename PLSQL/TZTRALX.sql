@@ -1061,6 +1061,18 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
                     vlc_tipoFactura_TSTA := 'NC';
                 ELSIF (proceso_factura = 'CP') THEN
                     vlc_tipoFactura_TSTA := 'FP';
+                ELSIF (proceso_factura = 'FST') THEN
+                    SELECT COUNT(*)
+                    INTO vln_contador
+                    FROM tbraccd
+                    WHERE tbraccd_pidm = vln_pidm
+                        AND tbraccd_tran_number = tran_number
+                        AND tbraccd_detail_code = 'FANT'
+                    ;
+
+                    IF (vln_contador > 0) THEN
+                        vlc_tipoFactura_TSTA := 'FA';
+                    END IF;
                 END IF;
 
                 pr_registrar_debug('fn_factura_base_tralix', '2) vlcTipoFacturaTSTA:'||vlc_tipoFactura_TSTA);
@@ -1469,7 +1481,6 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
 
         pr_registrar_debug('fn_sustitucion_tralix', 'buffer:'||bufferMensaje);
                 
-
         IF (vlb_estatusEnvio) THEN
             vlc_llamada := tzkrsta.fn_sustituir_factura(vln_pidm_orig, tran_number_orig, vlc_guid_sustituir);
 
@@ -1718,7 +1729,20 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         pin_tran_number IN NUMBER
     ) RETURN BOOLEAN IS
         vlb_respuesta BOOLEAN := false;
+        vln_contador NUMBER := 0;
     BEGIN
+        SELECT COUNT(*)
+        INTO vln_contador
+        FROM tbraccd
+        WHERE tbraccd_pidm = pin_pidm
+            AND tbraccd_tran_number = pin_tran_number
+            AND tbraccd_detail_code = 'FANT'
+        ;
+
+        IF (vln_contador > 0) THEN
+            RETURN true;
+        END IF;
+
         vlb_respuesta := (pago_de_fa(pin_pidm, pin_tran_number) = 'PPD');
 
         RETURN vlb_respuesta;
