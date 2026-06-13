@@ -143,13 +143,13 @@ WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00084868')
 
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00084868';   -- A00084989
-	tran_number NUMBER := 22;     -- 7
+	matricula VARCHAR2(20 CHAR) := 'A00215186';   -- A00084989
+	tran_number NUMBER := 5;     -- 7
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 BEGIN
-	vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '01');
-	--vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(gb_common.f_get_id(104744), tran_number, '28', 'PUE');
+	-- vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '01');
+	vlt_respuesta := ipadedev.tztralx.fn_factura_tralix(matricula, tran_number, '28', 'PUE');
 	dbms_output.put_line('Estatus RESP:'||vlt_respuesta.estatus);
 	--IF (vlt_respuesta.estatus != 'OK') THEN
 	IF (vlt_respuesta.errores.COUNT > 0) THEN

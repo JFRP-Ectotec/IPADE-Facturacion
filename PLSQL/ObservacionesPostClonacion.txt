@@ -1,0 +1,3 @@
+Deben existir dos personas IPADE1 e IPADE2 en SPRIDEN, con direcciones de tipo F%
+Crear un GORADID explicito de RFC para PUBGRAL1 y PUBGRAL2
+Meter en TVVDLOC tipos de factura.

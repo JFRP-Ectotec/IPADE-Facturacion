@@ -65,23 +65,23 @@ ORDER BY tzrpofi_activity_date DESC
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00085516';
-	tran_number NUMBER := 17;
+	matricula VARCHAR2(20 CHAR) := 'A00215186';
+	tran_number NUMBER := 5;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
 	tran_original NUMBER := 12;
 	tran_impuestos NUMBER := 9;
 	desc_original VARCHAR2(100 CHAR) := 'S';
-	fecha_emision DATE := TO_DATE('13-APR-2026', 'DD-MON-YYYY');
+	fecha_emision DATE := TO_DATE('12-JUN-2026', 'DD-MON-YYYY');
 	tipo_pago VARCHAR2(10 CHAR) := '03';
 	pago_factura VARCHAR2(10 CHAR) := 'PUE';
 	data_origin VARCHAR2(50 CHAR) := 'DEBUG';
 BEGIN
 	-- vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD',
 	-- 	'FAC',  tran_original, tran_impuestos, desc_original, fecha_emision, 'DEBUG');
-	vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, tipo_pago, 
-		pago_factura, 'FAC', fecha_emision, data_origin);
-	-- vlt_respuesta := ipadedev.tztralx.fn_cancela_tralix(matricula, tran_number, '01');
+	-- vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, tipo_pago, 
+	-- 	pago_factura, 'FAC', fecha_emision, data_origin);
+	vlt_respuesta := ipadedev.tztralx.fn_cancela_tralix(matricula, tran_number, '02');
     -- vlt_respuesta := TZTRALX.fn_factura_cp_tralix(matricula, tran_number, '03', 'CDP', 
 	-- 	tran_original, fecha_emision, 'DEBUG');
 	-- vlt_respuesta := TZTRALX.fn_notacred_tralix(matricula, tran_number, '01', 'PUE',
@@ -120,7 +120,7 @@ SELECT TEST_TRALIX_IP1_SEQ.NEXTVAL FROM DUAL;
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE gurdbug_value LIKE '%A00085470%'   -- 85489
+WHERE gurdbug_value LIKE '%A00215186%'   -- 85489
     AND gurdbug_parm LIKE '%TZTRALX%'
     --AND gurdbug_activity_date > TO_DATE('17-APR-2026 11:40:00', 'DD-MON-YYYY HH24:MI:SS')
     --AND gurdbug_activity_date < TO_DATE('17-APR-2026 11:42:00', 'DD-MON-YYYY HH24:MI:SS') 
