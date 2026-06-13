@@ -784,8 +784,23 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
                 AND s.spriden_change_ind IS NULL
         ) loop
             SELF.rfc := j.goradid_additional_id;
-            SELF.identificador := SELF.rfc;
         END LOOP;
+
+        IF (NVL(SELF.rfc, '|') = '|') THEN
+            FOR j IN (
+                SELECT g.goradid_additional_id
+                FROM goradid g
+                    JOIN spriden s ON (g.goradid_pidm = s.spriden_pidm)
+                WHERE g.goradid_adid_code LIKE '%RFC'
+                    AND s.spriden_id = 'PUBGRAL' || SELF.numEntidad
+                    AND s.spriden_change_ind IS NULL
+                ORDER BY g.goradid_adid_code
+            ) loop
+                SELF.rfc := j.goradid_additional_id;
+            END LOOP;
+        END IF;
+
+        SELF.identificador := SELF.rfc;
 
         FOR r IN (
             SELECT g.goradid_additional_id
