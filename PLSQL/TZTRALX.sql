@@ -671,6 +671,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vln_tran_number_orig NUMBER;
         vln_contador NUMBER;
         vlc_programa_buscar VARCHAR2(100 CHAR);
+        vln_amount_compPago TBRACCD.TBRACCD_AMOUNT%TYPE;
     BEGIN
         pr_registrar_debug('fn_factura_base', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number||' tipo_pago_banner:'||
             tipo_pago_banner||' tipo_pago_facturar:'||tipo_pago_facturar||' proceso_factura:'||proceso_factura||' mat_orig_ant:'||matricula_orig_ant
@@ -894,6 +895,23 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             datosCompPago := ty_tralix_comppago(matricula, tran_number, vln_tran_number_orig,
                 vlc_num_entidad, 1, vlc_tipo_pago_banner, tipo_pago_facturar, fecha_emision);
             datosCompPago.validar;
+
+            /* Revisar el amount de la transaccion, si es mayor al saldo anterior de datosCompPago agregarlo a errores. */
+            FOR i IN (
+                SELECT tbraccd_amount
+                FROM tbraccd
+                WHERE tbraccd_pidm = vln_pidm
+                    AND tbraccd_tran_number = tran_number
+            ) LOOP
+                vln_amount_compPago := i.tbraccd_amount;
+            END LOOP;
+            
+            IF (datosCompPago.doctoRel.impSaldoAnt < vln_amount_compPago) THEN
+                vlt_respuesta.estatus := 'ERROR';
+                vlt_respuesta.AGREGAR_ERROR('El monto del complemento no puede ser mayor al saldo anterior.');
+                RETURN vlt_respuesta;
+            END IF;
+
             IF (datosCompPago.errores.COUNT > 0) THEN
                 vlt_respuesta.estatus := 'ERROR';
                 FOR m IN datosCompPago.errores.FIRST .. datosCompPago.errores.LAST
@@ -1602,6 +1620,7 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
         vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
         vlc_tipo_pago_anticipada tvrtsta.tvrtsta_dloc_code%TYPE;
         vlc_mensaje_error VARCHAR2(200 CHAR);
+        vln_contador NUMBER := 0;
     BEGIN
         pr_registrar_debug('fn_factura_cp_tralix', 'DO:'||data_origin||' matricula:'||matricula||' tran_number:'||tran_number
             ||' tipo_pago_banner:'||tipo_pago_banner||' etiqueta:'||etiqueta||' tran_a_pagar:'||tran_a_pagar
@@ -1625,6 +1644,21 @@ CREATE OR REPLACE PACKAGE BODY TZTRALX IS
             vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
             vlt_respuesta.estatus := 'ERROR';
             vlt_respuesta.agregar_error(vlc_mensaje_error);
+            RETURN vlt_respuesta;
+        END IF;
+
+        -- Revisar que la factura original no esté cancelada
+        SELECT COUNT(*)
+        INTO vln_contador
+        FROM tvrtsta
+        WHERE tvrtsta_pidm = vln_pidm
+            AND tvrtsta_tsta_code LIKE 'CA%'
+        ;
+
+        IF (vln_contador > 0) THEN
+            vlt_respuesta := TY_TRALIX_ENVIOFAC_RESPONSE(matricula, tran_number);
+            vlt_respuesta.estatus := 'ERROR';
+            vlt_respuesta.agregar_error('No se puede emitir un complemento sobre un factura ya cancelada.');
             RETURN vlt_respuesta;
         END IF;
 

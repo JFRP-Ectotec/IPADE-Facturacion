@@ -557,18 +557,22 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_03 UNDER TY_TRALIX_LINEA
     /* TODO: Agregar parametro que indique se va a construir como PubGral */
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_03(
         pidm NUMBER,
-        num_entidad VARCHAR2
+        num_entidad VARCHAR2,
+        tran_original NUMBER
     ) RETURN SELF AS RESULT,
     MEMBER PROCEDURE datos_pubgral,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
     MEMBER FUNCTION esParaPubGral RETURN BOOLEAN,
-    MEMBER PROCEDURE validar
+    MEMBER PROCEDURE validar,
+    MEMBER PROCEDURE aplicar_datos_factorig(pidm IN NUMBER, 
+        tran_number IN NUMBER, num_grupo IN NUMBER)
 );
 
 CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_03(
         pidm NUMBER,
-        num_entidad VARCHAR2
+        num_entidad VARCHAR2,
+        tran_original NUMBER
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
         contador NUMBER := 0;
@@ -731,6 +735,10 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
 
         SELF.esPubGral := 'FALSE';
 
+        IF (tran_original > 0) THEN
+            aplicar_datos_factorig(pidm, tran_original, numGrupo);
+        END IF;
+
         RETURN;
     END TY_TRALIX_LINEA_03;
 
@@ -873,6 +881,49 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
             SELF.AGREGAR_ERROR('Debe haber valor de regimen Fiscal.');
         END IF;
     END validar;
+
+    MEMBER PROCEDURE aplicar_datos_factorig(pidm IN NUMBER, 
+        tran_number IN NUMBER, num_grupo IN NUMBER) IS
+    BEGIN
+        FOR j IN (
+            SELECT tvrtsta_tsta_code, tvrtsta_comments
+            FROM tvrtsta
+            WHERE tvrtsta_pidm = pidm
+                AND tvrtsta_tran_number = tran_number
+            ORDER BY tvrtsta_tsta_code
+        ) LOOP
+            IF (j.tvrtsta_tsta_code = 'FC'||num_grupo) THEN
+                SELF.identificador := j.tvrtsta_comments;
+                SELF.rfc := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'NAT') THEN
+                SELF.pais := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'CL1') THEN
+                SELF.calle := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'CL2') THEN
+                SELF.numExterior := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'CL3') THEN
+                SELF.colonia := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'CIT') THEN
+                SELF.localidad := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'CNT') THEN
+                SELF.municipio := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'STA') THEN
+                SELF.estado := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'ZIP') THEN
+                SELF.domFiscal := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'UF'||num_grupo) THEN
+                SELF.usoCFDI := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code = 'RF'||num_grupo) THEN
+                SELF.regimenFiscal := j.tvrtsta_comments;
+            ELSIF (j.tvrtsta_tsta_code LIKE numGrupo||'R%') THEN
+                IF (j.tvrtsta_tsta_code = numGrupo||'R1') THEN
+                    SELF.nombre := j.tvrtsta_comments;
+                ELSE
+                    SELF.nombre := SELF.nombre || j.tvrtsta_comments;
+                END IF;
+            END IF;
+        END LOOP;
+    END aplicar_datos_factorig;
 END;
 
 ----------------
@@ -1631,7 +1682,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             difEmpresa, metodoPago, formaPago, fechaEmision, procesoFactura);
         numLineas := numLineas + 1;
         
-        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
+        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad, 0);
         numLineas := numLineas + 1;
         
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;

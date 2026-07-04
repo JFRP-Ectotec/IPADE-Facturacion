@@ -54,6 +54,16 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPPAGOS AS
 
         SELF.idPagos := idPagos;
         SELF.FechaPago := SYSDATE;
+
+        FOR i IN (
+            SELECT tbraccd_trans_date
+            FROM tbraccd
+            WHERE tbraccd_pidm = pidm
+                AND tbraccd_tran_number = tranNumberCP
+        ) LOOP
+            SELF.FechaPago := i.tbraccd_trans_date;
+        END LOOP;
+
         SELF.FormaPagoP := formaPago;
         SELF.MonedaP := 'MXN';
         SELF.TipoCambioP := 1;
@@ -430,10 +440,18 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPDOCTREL AS
 
         SELECT COUNT(*) + 1
         INTO SELF.numParcialidad
-        FROM tvrtsta
-        WHERE tvrtsta_pidm = pidm
-            AND tvrtsta_tran_number = tranOriginal
-            AND REGEXP_LIKE (tvrtsta_tsta_code, 'UI\d')
+        FROM tvrtsta t1
+        WHERE t1.tvrtsta_pidm = pidm
+            AND t1.tvrtsta_tran_number = tranOriginal
+            AND REGEXP_LIKE (t1.tvrtsta_tsta_code, 'UI\d')
+            AND NOT EXISTS
+            (
+                SELECT 1
+                FROM tvrtsta t2
+                WHERE t2.tvrtsta_pidm = t1.tvrtsta_pidm
+                    AND t2.tvrtsta_tran_number = t1.tvrtsta_tran_number
+                    AND REGEXP_LIKE (t2.tvrtsta_tsta_code, 'CA\d')
+            )
         ;
 
         -- SELF.numParcialidad := 1;
@@ -693,7 +711,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         SELF.REGISTRAR_DEBUG('TY_TRALIX_COMPPAGO', SELF.info_gral_comprobante.imprimir_linea);
         -- SELF.estatus_debug := 'I';
 
-        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad);
+        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad, tranOriginal);
 
         -- IF (SELF.receptor.esPubGral = 'TRUE') THEN
         --     SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;
@@ -972,4 +990,3 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
     END validar;
 END;
 /
-
