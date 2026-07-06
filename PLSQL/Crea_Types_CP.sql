@@ -711,7 +711,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_COMPPAGO AS
         SELF.REGISTRAR_DEBUG('TY_TRALIX_COMPPAGO', SELF.info_gral_comprobante.imprimir_linea);
         -- SELF.estatus_debug := 'I';
 
-        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad, tranOriginal);
+        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad, tranOriginal, true);
 
         -- IF (SELF.receptor.esPubGral = 'TRUE') THEN
         --     SELF.receptor.idParticipante := 'PUBGRAL' || numEntidad;

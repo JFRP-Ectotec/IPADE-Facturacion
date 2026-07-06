@@ -558,21 +558,23 @@ CREATE OR REPLACE TYPE TY_TRALIX_LINEA_03 UNDER TY_TRALIX_LINEA
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_03(
         pidm NUMBER,
         num_entidad VARCHAR2,
-        tran_original NUMBER
+        tran_original NUMBER,
+        comp_pago BOOLEAN
     ) RETURN SELF AS RESULT,
     MEMBER PROCEDURE datos_pubgral,
     MEMBER FUNCTION imprimir_linea RETURN VARCHAR2,
     MEMBER FUNCTION esParaPubGral RETURN BOOLEAN,
     MEMBER PROCEDURE validar,
     MEMBER PROCEDURE aplicar_datos_factorig(pidm IN NUMBER, 
-        tran_number IN NUMBER, num_grupo IN NUMBER)
+        tran_number IN NUMBER)
 );
 
 CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
     CONSTRUCTOR FUNCTION TY_TRALIX_LINEA_03(
         pidm NUMBER,
         num_entidad VARCHAR2,
-        tran_original NUMBER
+        tran_original NUMBER,
+        comp_pago BOOLEAN
     ) RETURN SELF AS RESULT IS
         parent TY_TRALIX_LINEA;
         contador NUMBER := 0;
@@ -588,6 +590,14 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
         -- SELF.nombre := 'INSTITUTO PANAMERICANO DE ALTA DIRECCION DE EMPRESA';
         -- SELF.regimenFiscal := '612';   -- Tomado del catalogo c_RegimenFiscal, este valor default es el de personas fisicas
         SELF.usoCFDI := 'D10';    -- Tomado del catalgo c_usoCFDI
+
+        IF (comp_pago) THEN
+            dbms_output.put_line('CompPago');
+            SELF.aplicar_datos_factorig(pidm, tran_original);
+            RETURN;
+        ELSE
+            dbms_output.put_line('Normal');
+        END IF;
 
         SELF.nombreParticipante := f_format_name(pidm, 'FMIL');
 
@@ -735,9 +745,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
 
         SELF.esPubGral := 'FALSE';
 
-        IF (tran_original > 0) THEN
-            aplicar_datos_factorig(pidm, tran_original, numGrupo);
-        END IF;
+
 
         RETURN;
     END TY_TRALIX_LINEA_03;
@@ -883,7 +891,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
     END validar;
 
     MEMBER PROCEDURE aplicar_datos_factorig(pidm IN NUMBER, 
-        tran_number IN NUMBER, num_grupo IN NUMBER) IS
+        tran_number IN NUMBER) IS
     BEGIN
         FOR j IN (
             SELECT tvrtsta_tsta_code, tvrtsta_comments
@@ -892,7 +900,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
                 AND tvrtsta_tran_number = tran_number
             ORDER BY tvrtsta_tsta_code
         ) LOOP
-            IF (j.tvrtsta_tsta_code = 'FC'||num_grupo) THEN
+            IF (j.tvrtsta_tsta_code LIKE 'FC%') THEN
                 SELF.identificador := j.tvrtsta_comments;
                 SELF.rfc := j.tvrtsta_comments;
             ELSIF (j.tvrtsta_tsta_code = 'NAT') THEN
@@ -911,12 +919,12 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
                 SELF.estado := j.tvrtsta_comments;
             ELSIF (j.tvrtsta_tsta_code = 'ZIP') THEN
                 SELF.domFiscal := j.tvrtsta_comments;
-            ELSIF (j.tvrtsta_tsta_code = 'UF'||num_grupo) THEN
+            ELSIF (j.tvrtsta_tsta_code LIKE 'UF%') THEN
                 SELF.usoCFDI := j.tvrtsta_comments;
-            ELSIF (j.tvrtsta_tsta_code = 'RF'||num_grupo) THEN
+            ELSIF (j.tvrtsta_tsta_code LIKE 'RF%') THEN
                 SELF.regimenFiscal := j.tvrtsta_comments;
-            ELSIF (j.tvrtsta_tsta_code LIKE numGrupo||'R%') THEN
-                IF (j.tvrtsta_tsta_code = numGrupo||'R1') THEN
+            ELSIF (REGEXP_LIKE(j.tvrtsta_tsta_code, '^[0-9]R[0-9]$')) THEN
+                IF (j.tvrtsta_tsta_code LIKE '%R1') THEN
                     SELF.nombre := j.tvrtsta_comments;
                 ELSE
                     SELF.nombre := SELF.nombre || j.tvrtsta_comments;
@@ -1682,7 +1690,7 @@ create or replace TYPE BODY TY_TRALIX_FACTURA AS
             difEmpresa, metodoPago, formaPago, fechaEmision, procesoFactura);
         numLineas := numLineas + 1;
         
-        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad, 0);
+        SELF.receptor := ty_tralix_linea_03(vln_pidm, numEntidad, 0, false);
         numLineas := numLineas + 1;
         
         SELF.envio_automatico.idIntReceptor := SELF.receptor.identificador;

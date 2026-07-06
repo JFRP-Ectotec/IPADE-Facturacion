@@ -76,19 +76,19 @@ WHERE tbraccd_pidm = gb_common.f_get_pidm('A00225007')
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00225007';
-	tran_number NUMBER := 35;
+	matricula VARCHAR2(20 CHAR) := 'A00225023';
+	tran_number NUMBER := 19;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 20;
+	tran_original NUMBER := 16;
 	tran_impuestos NUMBER := NULL;
 	desc_original VARCHAR2(100 CHAR) := 'S';
-	fecha_emision DATE := TO_DATE('02-JUL-2026', 'DD-MON-YYYY');
+	fecha_emision DATE := TO_DATE('06-JUL-2026', 'DD-MON-YYYY');
 	tipo_pago VARCHAR2(10 CHAR) := '03';
 	pago_factura VARCHAR2(10 CHAR) := 'PUE';
 	data_origin VARCHAR2(50 CHAR) := 'DEBUG';
 BEGIN
-	--vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD',
+	-- vlt_respuesta := TZTRALX.fn_factura_ant_tralix(matricula, tran_number, '99', 'PPD',
 	-- 	'FAC',  tran_original, tran_impuestos, desc_original, fecha_emision, 'DEBUG');
 	-- vlt_respuesta := TZTRALX.fn_factura_tralix(matricula, tran_number, tipo_pago, 
 	-- 	pago_factura, 'FAC', fecha_emision, data_origin);
@@ -121,6 +121,34 @@ WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00085149')
     AND tvrtsta_tsta_code LIKE 'CA%'
 ;
 
+SELECT *
+FROM tzrpofi
+WHERE tzrpofi_sdoc_code = 'PBA'
+	AND tzrpofi_doc_number = 13465
+;
+
+SELECT tvrtsta_tsta_code, tvrtsta_comments
+FROM tvrtsta
+WHERE tvrtsta_pidm = 245111
+	AND tvrtsta_tran_number = 16
+;
+
+SELECT *
+FROM goradid
+WHERE goradid_pidm = 245111
+;
+
+UPDATE goradid
+SET goradid_additional_id = '*MAVY9011226A7'
+WHERE goradid_pidm = 245111
+	AND goradid_adid_code = '4RFC'
+;
+
+SELECT *
+FROM spriden
+WHERE spriden_pidm = 245111
+;
+
 COMMIT;
 
 SELECT TO_CHAR(SYSDATE, 'DD-MON-YYYY HH24:MI:SS')
@@ -131,10 +159,10 @@ SELECT TEST_TRALIX_IP1_SEQ.NEXTVAL FROM DUAL;
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE /*gurdbug_value LIKE '%A00225007%:20%'   -- 85489
-    AND */gurdbug_parm LIKE '%TZTRALX%'
-    AND gurdbug_activity_date > TO_DATE('29-JUN-2026 12:07:00', 'DD-MON-YYYY HH24:MI:SS')
-    AND gurdbug_activity_date < TO_DATE('29-JUN-2026 12:08:00', 'DD-MON-YYYY HH24:MI:SS') 
+WHERE gurdbug_value LIKE '%A00225023%'   -- 85489
+    AND  gurdbug_parm LIKE '%TZTRALX%ura_cp%'
+    -- AND gurdbug_activity_date > TO_DATE('06-JUL-2026 08:31:00', 'DD-MON-YYYY HH24:MI:SS')
+    --AND gurdbug_activity_date < TO_DATE('06-JUL-2026 08:32:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
 	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
@@ -330,6 +358,7 @@ WHERE spriden_id = 'A00225007'
 
 SELECT tvrtsta_tsta_code, tvrtsta_comments
 FROM tvrtsta
-WHERE tvrtsta_pidm = 245095
-	AND tvrtsta_tran_number = 20
+WHERE tvrtsta_pidm = 245111
+	AND tvrtsta_tran_number = 16
+ORDER BY tvrtsta_tsta_code
 ;
