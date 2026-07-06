@@ -76,11 +76,11 @@ WHERE tbraccd_pidm = gb_common.f_get_pidm('A00225007')
 -- Revisar luego el calculo de impuestos.
 DECLARE
 	datos_banner CLOB;
-	matricula VARCHAR2(20 CHAR) := 'A00225023';
-	tran_number NUMBER := 19;
+	matricula VARCHAR2(20 CHAR) := 'A00225027';
+	tran_number NUMBER := 13;
 	vlt_respuesta TY_TRALIX_ENVIOFAC_RESPONSE;
 	num_linea NUMBER := 1;
-	tran_original NUMBER := 16;
+	tran_original NUMBER := 10;
 	tran_impuestos NUMBER := NULL;
 	desc_original VARCHAR2(100 CHAR) := 'S';
 	fecha_emision DATE := TO_DATE('06-JUL-2026', 'DD-MON-YYYY');
@@ -159,14 +159,28 @@ SELECT TEST_TRALIX_IP1_SEQ.NEXTVAL FROM DUAL;
 -- Verificar en debug
 SELECT *
 FROM gurdbug
-WHERE gurdbug_value LIKE '%A00225023%'   -- 85489
-    AND  gurdbug_parm LIKE '%TZTRALX%ura_cp%'
-    -- AND gurdbug_activity_date > TO_DATE('06-JUL-2026 08:31:00', 'DD-MON-YYYY HH24:MI:SS')
-    --AND gurdbug_activity_date < TO_DATE('06-JUL-2026 08:32:00', 'DD-MON-YYYY HH24:MI:SS') 
+WHERE gurdbug_value LIKE '%A00225027%'   -- 85489
+    AND  gurdbug_parm LIKE '%TZTRALX%'
+    -- AND gurdbug_activity_date > TO_DATE('06-JUL-2026 16:49:00', 'DD-MON-YYYY HH24:MI:SS')
+    -- AND gurdbug_activity_date < TO_DATE('06-JUL-2026 16:51:00', 'DD-MON-YYYY HH24:MI:SS') 
 	-- AND gurdbug_value LIKE '%CON ERROR:%'
 	AND gurdbug_parm NOT LIKE '%sfkfees%'
 ORDER BY gurdbug_activity_date DESC
 ;
+
+SELECT tbraccd_detail_code, tbraccd_tran_number, tbraccd_amount, tbraccd_payment_id
+FROM tbraccd
+WHERE tbraccd_pidm = gb_common.f_get_pidm('A00225027')
+	AND tbraccd_tran_number IN (10, 13)
+;
+
+SELECT tb2.tbraccd_amount
+FROM tbraccd tb1
+	JOIN tbraccd tb2 ON (
+		tb1.tbraccd_pidm = tb2.tbraccd_pidm
+		AND tb1.tbraccd_payment_id = tb2.tbraccd_tran_number)    
+WHERE tb1.tbraccd_pidm = gb_common.f_get_pidm('A00225027')
+	AND tb1.tbraccd_tran_number = 10;
 
 SELECT TO_CHAR(SYSDATE, 'DD-MON-YYYY HH24:MI:SS')
 FROM dual

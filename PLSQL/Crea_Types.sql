@@ -591,14 +591,6 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
         -- SELF.regimenFiscal := '612';   -- Tomado del catalogo c_RegimenFiscal, este valor default es el de personas fisicas
         SELF.usoCFDI := 'D10';    -- Tomado del catalgo c_usoCFDI
 
-        IF (comp_pago) THEN
-            dbms_output.put_line('CompPago');
-            SELF.aplicar_datos_factorig(pidm, tran_original);
-            RETURN;
-        ELSE
-            dbms_output.put_line('Normal');
-        END IF;
-
         SELF.nombreParticipante := f_format_name(pidm, 'FMIL');
 
         FOR k IN (
@@ -622,6 +614,14 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
         ) LOOP
             SELF.programa := m.smrprle_program;
         END LOOP;
+
+        IF (comp_pago) THEN
+            dbms_output.put_line('CompPago');
+            SELF.aplicar_datos_factorig(pidm, tran_original);
+            RETURN;
+        ELSE
+            dbms_output.put_line('Normal');
+        END IF;
 
         /* Determinar RFC */
         FOR j IN (
@@ -921,7 +921,7 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_03 AS
                 SELF.domFiscal := j.tvrtsta_comments;
             ELSIF (j.tvrtsta_tsta_code LIKE 'UF%') THEN
                 SELF.usoCFDI := j.tvrtsta_comments;
-            ELSIF (j.tvrtsta_tsta_code LIKE 'RF%') THEN
+            ELSIF (REGEXP_LIKE(j.tvrtsta_tsta_code, '^RF[0-9]$')) THEN
                 SELF.regimenFiscal := j.tvrtsta_comments;
             ELSIF (REGEXP_LIKE(j.tvrtsta_tsta_code, '^[0-9]R[0-9]$')) THEN
                 IF (j.tvrtsta_tsta_code LIKE '%R1') THEN
