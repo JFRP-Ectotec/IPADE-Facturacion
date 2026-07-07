@@ -222,12 +222,16 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
                     tb1.tbraccd_pidm = tb2.tbraccd_pidm
                     AND tb1.tbraccd_payment_id = tb2.tbraccd_tran_number)    
             WHERE tb1.tbraccd_pidm = pidm
-                AND tb1.tbraccd_tran_number = tranNumberCP --tranOriginal
+                AND tb1.tbraccd_tran_number = tranOriginal -- tranNumberCP --tranOriginal
         ) LOOP
             totImpuestos := j.tbraccd_amount;
         END LOOP;
 
         SELF.montoTotalPagos := monto;
+        
+        dbms_output.put_line('** totImpuestos: '||totImpuestos);
+
+        
         IF (NVL(totImpuestos, 0) > 0) THEN
             -- SELF.totTrasladosBaseIVA16 := monto / 1.16;
             -- SELF.totTrasladosBaseIVA16 := totImpuestos;
@@ -244,6 +248,8 @@ CREATE OR REPLACE TYPE BODY TY_TRALIX_LINEA_COMPTOT AS
         -- SELF.registrar_debug('TY_TRALIX_LINEA_COMPTOT', 'totalPagos: '||SELF.montoTotalPagos);
         -- SELF.estatus_debug := 'I';
 
+        dbms_output.put_line('** totalPagos: '||SELF.montoTotalPagos);
+        
         RETURN;
     END TY_TRALIX_LINEA_COMPTOT;
 

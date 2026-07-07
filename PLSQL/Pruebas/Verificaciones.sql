@@ -67,11 +67,25 @@ ORDER BY tzrpofi_activity_date DESC
 -- WHERE tvrpays_pidm = 
 -- ;
 
-SELECT tbraccd_tran_number, tbraccd_amount, tbraccd_trans_date
-FROM tbraccd
-WHERE tbraccd_pidm = gb_common.f_get_pidm('A00225007')
-	AND tbraccd_tran_number IN (20, 35)
+SELECT *
+FROM spriden
+WHERE spriden_id = 'A00225007'
 ;
+
+SELECT tvrtsta_tsta_code, tvrtsta_comments
+FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00225027')
+	AND tvrtsta_tran_number = 10
+ORDER BY tvrtsta_tsta_code
+;
+
+DELETE FROM tvrtsta
+WHERE tvrtsta_pidm = gb_common.f_get_pidm('A00225027')
+	AND tvrtsta_tran_number = 10
+	AND tvrtsta_tsta_code = 'UI1'
+;
+
+COMMIT;
 
 -- Revisar luego el calculo de impuestos.
 DECLARE
@@ -171,10 +185,10 @@ ORDER BY gurdbug_activity_date DESC
 SELECT tbraccd_detail_code, tbraccd_tran_number, tbraccd_amount, tbraccd_payment_id
 FROM tbraccd
 WHERE tbraccd_pidm = gb_common.f_get_pidm('A00225027')
-	AND tbraccd_tran_number IN (10, 13)
+	AND tbraccd_tran_number IN (9, 10, 13)
 ;
 
-SELECT tb2.tbraccd_amount
+SELECT tb2.tbraccd_tran_number, tb2.tbraccd_amount
 FROM tbraccd tb1
 	JOIN tbraccd tb2 ON (
 		tb1.tbraccd_pidm = tb2.tbraccd_pidm
@@ -365,14 +379,3 @@ ORDER BY tvrtsta_activity_date DESC
 SELECT host, lower_port, upper_port, acl
 FROM   dba_network_acls;
 
-SELECT *
-FROM spriden
-WHERE spriden_id = 'A00225007'
-;
-
-SELECT tvrtsta_tsta_code, tvrtsta_comments
-FROM tvrtsta
-WHERE tvrtsta_pidm = 245111
-	AND tvrtsta_tran_number = 16
-ORDER BY tvrtsta_tsta_code
-;
